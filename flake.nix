@@ -6,17 +6,18 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
   };
 
-  outputs = { self, flake-utils, nixpkgs }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
+  outputs = {
+    self,
+    flake-utils,
+    nixpkgs,
+  }:
+    flake-utils.lib.eachDefaultSystem (
+      system: let
         pkgs = nixpkgs.legacyPackages.${system};
-      in
-      {
+      in {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             bun
-            nodejs
-            typescript
           ];
         };
       }
