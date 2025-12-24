@@ -1,0 +1,49 @@
+name: Nix Flake Build
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v12
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v7
+
+      - name: Install dependencies
+        run: nix develop --command bun install
+
+      - name: Build
+        run: nix develop --command bun run build
+
+      - name: Check type safety
+        run: nix develop --command bunx tsc --noEmit
+
+      - name: Run linter
+        run: nix develop --command bun run check
+
+      - name: Run tests
+        run: nix develop --command bun run test
+
+      - name: Verify build output
+        run: |
+          if [ -d dist ] && [ "$(ls -A dist)" ]; then
+            echo "Build successful!"
+            echo "Build artifacts:"
+            ls -la dist/
+          else
+            echo "Build output not found!"
+            exit 1
+          fi
