@@ -72,13 +72,42 @@ export interface PlayerState {
 	repeat: RepeatMode;
 }
 
+// ============================================================================
+// Volume Persistence
+// ============================================================================
+
+const VOLUME_STORAGE_KEY = "subsonic_player_volume";
+
+function getSavedVolume(): number {
+	try {
+		const saved = localStorage.getItem(VOLUME_STORAGE_KEY);
+		if (saved) {
+			const volume = parseFloat(saved);
+			if (!Number.isNaN(volume) && volume >= 0 && volume <= 1) {
+				return volume;
+			}
+		}
+	} catch (err) {
+		console.warn("Failed to read volume from localStorage:", err);
+	}
+	return 1;
+}
+
+function saveVolumeToStorage(volume: number) {
+	try {
+		localStorage.setItem(VOLUME_STORAGE_KEY, volume.toString());
+	} catch (err) {
+		console.warn("Failed to save volume to localStorage:", err);
+	}
+}
+
 const initialState: PlayerState = {
 	currentTrack: null,
 	queue: [],
 	originalQueue: [],
 	queueIndex: -1,
 	isPlaying: false,
-	volume: 1,
+	volume: getSavedVolume(),
 	currentTime: 0,
 	duration: 0,
 	isLoading: false,
@@ -343,6 +372,7 @@ export function setVolume(volume: number) {
 	const clampedVolume = Math.max(0, Math.min(1, volume));
 	audioEl.volume = clampedVolume;
 	updateState({ volume: clampedVolume });
+	saveVolumeToStorage(clampedVolume);
 }
 
 export function addToQueue(songs: Song[]) {
