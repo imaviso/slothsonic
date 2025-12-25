@@ -1,26 +1,47 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
+	ChevronsLeft,
+	ChevronsRight,
 	Disc3,
 	Home,
 	Library,
+	ListMusic,
 	LogOut,
-	Menu,
 	Moon,
 	Music,
 	Search,
 	Sun,
 	Tags,
 	Users,
-	X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { Player } from "@/components/Player";
 import { Button } from "@/components/ui/button";
+import {
+	Sidebar,
+	SidebarContent,
+	SidebarFooter,
+	SidebarGroup,
+	SidebarGroupContent,
+	SidebarHeader,
+	SidebarInset,
+	SidebarMenu,
+	SidebarMenuButton,
+	SidebarMenuItem,
+	SidebarProvider,
+	SidebarRail,
+	SidebarTrigger,
+	useSidebar,
+} from "@/components/ui/sidebar";
 import { useAuth } from "@/lib/auth";
-import { usePlayer } from "@/lib/player";
+import {
+	enableQueueSync,
+	isQueueSyncEnabled,
+	restoreQueue,
+	usePlayer,
+} from "@/lib/player";
 import { useTheme } from "@/lib/theme";
-import { cn } from "@/lib/utils";
 
 interface AppLayoutProps {
 	children: React.ReactNode;
@@ -31,21 +52,25 @@ const navItems = [
 	{ to: "/app/search", icon: Search, label: "Search" },
 	{ to: "/app/albums", icon: Disc3, label: "Albums" },
 	{ to: "/app/artists", icon: Users, label: "Artists" },
+	{ to: "/app/playlists", icon: ListMusic, label: "Playlists" },
 	{ to: "/app/genres", icon: Tags, label: "Genres" },
 	{ to: "/app/songs", icon: Music, label: "Songs" },
 ];
 
-export function AppLayout({ children }: AppLayoutProps) {
+function AppSidebar() {
 	const { logout, credentials } = useAuth();
 	const { theme, setTheme } = useTheme();
-	const { currentTrack } = usePlayer();
 	const router = useRouterState();
+	const navigate = useNavigate();
 	const currentPath = router.location.pathname;
-	const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+	const { setOpenMobile, isMobile, toggleSidebar, state } = useSidebar();
 
+	// Close mobile menu on navigation
 	// biome-ignore lint: currentPath is intentionally used to trigger menu close on navigation
 	useEffect(() => {
-		setMobileMenuOpen(false);
+		if (isMobile) {
+			setOpenMobile(false);
+		}
 	}, [currentPath]);
 
 	const toggleTheme = () => {
@@ -56,158 +81,178 @@ export function AppLayout({ children }: AppLayoutProps) {
 		}
 	};
 
-	const hasPlayer = currentTrack !== null;
-
-	const sidebarContent = (
-		<>
-			{/* Logo */}
-			<div className="p-6 border-b">
-				<Link to="/app" className="flex items-center gap-3">
-					<div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-						<Library className="w-5 h-5 text-primary-foreground" />
-					</div>
-					<div>
-						<h1 className="font-semibold text-foreground">Subsonic</h1>
-						<p className="text-xs text-muted-foreground truncate max-w-32">
-							{credentials?.serverUrl?.replace(/https?:\/\//, "")}
-						</p>
-					</div>
-				</Link>
-			</div>
-
-			{/* Navigation */}
-			<nav className="flex-1 p-4 overflow-auto">
-				<ul className="space-y-1">
-					{navItems.map((item) => {
-						const isActive =
-							currentPath === item.to ||
-							(item.to !== "/app" && currentPath.startsWith(item.to));
-						return (
-							<li key={item.to}>
-								<Link
-									to={item.to}
-									className={cn(
-										"flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-										isActive
-											? "bg-primary text-primary-foreground"
-											: "text-muted-foreground hover:text-foreground hover:bg-muted",
-									)}
-								>
-									<item.icon className="w-5 h-5" />
-									{item.label}
-								</Link>
-							</li>
-						);
-					})}
-				</ul>
-			</nav>
-
-			{/* User section - matches player height */}
-			<div className="px-4 border-t h-20 flex items-center">
-				<div className="flex items-center justify-between w-full">
-					<div className="flex items-center gap-2 min-w-0">
-						<div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-							<span className="text-xs font-medium text-muted-foreground">
-								{credentials?.username?.charAt(0).toUpperCase()}
-							</span>
-						</div>
-						<span className="text-sm font-medium truncate">
-							{credentials?.username}
-						</span>
-					</div>
-					<div className="flex items-center gap-1">
-						<Button
-							variant="ghost"
-							size="icon"
-							onClick={toggleTheme}
-							title={theme === "dark" ? "Light mode" : "Dark mode"}
-						>
-							{theme === "dark" ? (
-								<Sun className="w-4 h-4" />
-							) : (
-								<Moon className="w-4 h-4" />
-							)}
-						</Button>
-						<Button
-							variant="ghost"
-							size="icon"
-							onClick={logout}
-							title="Sign out"
-						>
-							<LogOut className="w-4 h-4" />
-						</Button>
-					</div>
-				</div>
-			</div>
-		</>
-	);
+	const handleLogout = () => {
+		logout();
+		navigate({ to: "/" });
+	};
 
 	return (
-		<div className="h-screen bg-background flex flex-col md:flex-row">
+		<Sidebar collapsible="icon">
+			<SidebarHeader className="border-b">
+				<SidebarMenu>
+					<SidebarMenuItem>
+						<SidebarMenuButton size="lg" asChild tooltip="Subsonic">
+							<Link to="/app">
+								<div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+									<Library className="size-4" />
+								</div>
+								<div className="grid flex-1 text-left text-sm leading-tight">
+									<span className="truncate font-semibold">Subsonic</span>
+									<span className="truncate text-xs text-muted-foreground">
+										{credentials?.serverUrl?.replace(/https?:\/\//, "")}
+									</span>
+								</div>
+							</Link>
+						</SidebarMenuButton>
+						{/* Desktop collapse button */}
+						<Button
+							variant="ghost"
+							size="icon"
+							className="hidden md:flex size-7 absolute right-2 top-1/2 -translate-y-1/2 group-data-[collapsible=icon]:hidden"
+							onClick={toggleSidebar}
+							title="Collapse sidebar"
+						>
+							<ChevronsLeft className="size-4" />
+						</Button>
+					</SidebarMenuItem>
+				</SidebarMenu>
+			</SidebarHeader>
+
+			<SidebarContent>
+				<SidebarGroup>
+					<SidebarGroupContent>
+						<SidebarMenu>
+							{navItems.map((item) => {
+								const isActive =
+									currentPath === item.to ||
+									(item.to !== "/app" && currentPath.startsWith(item.to));
+								return (
+									<SidebarMenuItem key={item.to}>
+										<SidebarMenuButton
+											asChild
+											isActive={isActive}
+											tooltip={item.label}
+										>
+											<Link to={item.to}>
+												<item.icon />
+												<span>{item.label}</span>
+											</Link>
+										</SidebarMenuButton>
+									</SidebarMenuItem>
+								);
+							})}
+						</SidebarMenu>
+					</SidebarGroupContent>
+				</SidebarGroup>
+			</SidebarContent>
+
+			<SidebarFooter className="border-t h-20 justify-center">
+				<SidebarMenu>
+					{/* Expand button - only visible when collapsed */}
+					{state === "collapsed" && !isMobile && (
+						<SidebarMenuItem>
+							<SidebarMenuButton
+								onClick={toggleSidebar}
+								tooltip="Expand sidebar"
+							>
+								<ChevronsRight />
+								<span>Expand</span>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
+					)}
+					<SidebarMenuItem>
+						<SidebarMenuButton size="lg" tooltip={credentials?.username}>
+							<div className="flex aspect-square size-8 items-center justify-center rounded-full bg-muted">
+								<span className="text-xs font-medium text-muted-foreground">
+									{credentials?.username?.charAt(0).toUpperCase()}
+								</span>
+							</div>
+							<div className="grid flex-1 text-left text-sm leading-tight">
+								<span className="truncate font-medium">
+									{credentials?.username}
+								</span>
+							</div>
+							<div className="flex items-center gap-1">
+								<Button
+									variant="ghost"
+									size="icon"
+									className="size-7"
+									onClick={(e) => {
+										e.preventDefault();
+										e.stopPropagation();
+										toggleTheme();
+									}}
+									title={theme === "dark" ? "Light mode" : "Dark mode"}
+								>
+									{theme === "dark" ? (
+										<Sun className="size-4" />
+									) : (
+										<Moon className="size-4" />
+									)}
+								</Button>
+								<Button
+									variant="ghost"
+									size="icon"
+									className="size-7"
+									onClick={(e) => {
+										e.preventDefault();
+										e.stopPropagation();
+										handleLogout();
+									}}
+									title="Sign out"
+								>
+									<LogOut className="size-4" />
+								</Button>
+							</div>
+						</SidebarMenuButton>
+					</SidebarMenuItem>
+				</SidebarMenu>
+			</SidebarFooter>
+
+			<SidebarRail />
+		</Sidebar>
+	);
+}
+
+function AppContent({ children }: { children: React.ReactNode }) {
+	const { currentTrack } = usePlayer();
+	const hasPlayer = currentTrack !== null;
+
+	// Enable queue sync and restore queue on mount
+	useEffect(() => {
+		if (!isQueueSyncEnabled()) {
+			enableQueueSync();
+			restoreQueue();
+		}
+	}, []);
+
+	return (
+		<SidebarInset className="h-svh flex flex-col">
 			{/* Mobile header */}
-			<header className="md:hidden flex items-center justify-between p-4 border-b bg-card">
-				<Link to="/app" className="flex items-center gap-2">
-					<div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-						<Library className="w-4 h-4 text-primary-foreground" />
+			<header className="flex h-14 items-center gap-2 border-b px-4 md:hidden shrink-0">
+				<SidebarTrigger />
+				<div className="flex items-center gap-2">
+					<div className="size-7 rounded-lg bg-primary flex items-center justify-center">
+						<Library className="size-4 text-primary-foreground" />
 					</div>
 					<span className="font-semibold text-foreground">Subsonic</span>
-				</Link>
-				<Button
-					variant="ghost"
-					size="icon"
-					onClick={() => setMobileMenuOpen(true)}
-					aria-label="Open menu"
-				>
-					<Menu className="w-5 h-5" />
-				</Button>
+				</div>
 			</header>
 
-			{/* Mobile drawer overlay */}
-			{mobileMenuOpen && (
-				// biome-ignore lint/a11y/noStaticElementInteractions: Overlay used for click-to-dismiss pattern
-				<div
-					role="presentation"
-					className="fixed inset-0 z-50 md:hidden"
-					onClick={() => setMobileMenuOpen(false)}
-				>
-					{/* Backdrop */}
-					<div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+			{/* Scrollable content */}
+			<main className="flex-1 overflow-auto">{children}</main>
 
-					{/* Drawer */}
-					<aside
-						className="absolute left-0 top-0 h-full w-64 max-w-[80vw] bg-card border-r flex flex-col shadow-xl"
-						onClick={(e) => e.stopPropagation()}
-						onKeyDown={(e) => e.stopPropagation()}
-					>
-						{/* Close button */}
-						<div className="absolute top-4 right-4">
-							<Button
-								variant="ghost"
-								size="icon"
-								onClick={() => setMobileMenuOpen(false)}
-								aria-label="Close menu"
-							>
-								<X className="w-5 h-5" />
-							</Button>
-						</div>
-						{sidebarContent}
-					</aside>
-				</div>
-			)}
+			{/* Player bar */}
+			{hasPlayer && <Player />}
+		</SidebarInset>
+	);
+}
 
-			{/* Desktop Sidebar */}
-			<aside className="hidden md:flex w-64 border-r bg-card flex-col flex-shrink-0">
-				{sidebarContent}
-			</aside>
-
-			{/* Main content area with player */}
-			<div className="flex-1 flex flex-col overflow-hidden">
-				{/* Scrollable content */}
-				<main className="flex-1 overflow-auto">{children}</main>
-
-				{/* Player bar - at bottom of main content */}
-				{hasPlayer && <Player />}
-			</div>
-		</div>
+export function AppLayout({ children }: AppLayoutProps) {
+	return (
+		<SidebarProvider>
+			<AppSidebar />
+			<AppContent>{children}</AppContent>
+		</SidebarProvider>
 	);
 }

@@ -5,6 +5,7 @@ import type { Song } from "@/lib/api";
 import { getCoverArtUrl } from "@/lib/api";
 import { playSong, usePlayer } from "@/lib/player";
 import { cn } from "@/lib/utils";
+import { AddToPlaylistButton } from "./AddToPlaylistButton";
 import { StarButton } from "./StarButton";
 
 function formatDuration(seconds: number): string {
@@ -53,8 +54,8 @@ function SongRow({
 			className={cn(
 				"w-full grid gap-4 px-4 py-2 hover:bg-muted/50 transition-colors group",
 				showAlbum
-					? "grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_1fr_1fr_auto_auto]"
-					: "grid-cols-[auto_1fr_auto_auto]",
+					? "grid-cols-[auto_1fr_auto_auto_auto] sm:grid-cols-[auto_1fr_1fr_auto_auto_auto]"
+					: "grid-cols-[auto_1fr_auto_auto_auto]",
 				isCurrentTrack && "bg-muted/30",
 			)}
 		>
@@ -147,6 +148,11 @@ function SongRow({
 				/>
 			</div>
 
+			{/* Add to playlist */}
+			<div className="flex items-center">
+				<AddToPlaylistButton songId={song.id} song={song} size="sm" />
+			</div>
+
 			{/* Duration */}
 			<div className="flex items-center">
 				<span className="text-sm text-muted-foreground">
@@ -210,14 +216,15 @@ export function SongList({
 					className={cn(
 						"grid gap-4 px-4 py-2 border-b text-sm text-muted-foreground",
 						showAlbum
-							? "grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_1fr_1fr_auto_auto]"
-							: "grid-cols-[auto_1fr_auto_auto]",
+							? "grid-cols-[auto_1fr_auto_auto_auto] sm:grid-cols-[auto_1fr_1fr_auto_auto_auto]"
+							: "grid-cols-[auto_1fr_auto_auto_auto]",
 					)}
 				>
 					<span className="w-8 text-center">#</span>
 					<span>Title</span>
 					{showAlbum && <span className="hidden sm:block">Album</span>}
-					{/* Empty header for star column */}
+					{/* Empty headers for star and playlist columns */}
+					<span />
 					<span />
 					<span className="flex items-center gap-1">
 						<Clock className="w-4 h-4" />

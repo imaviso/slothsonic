@@ -471,3 +471,362 @@ export async function getSongsByGenre(
 
 	return data["subsonic-response"].songsByGenre?.song ?? [];
 }
+
+// ============================================================================
+// Playlist Types and Functions
+// ============================================================================
+
+export interface Playlist {
+	id: string;
+	name: string;
+	comment?: string;
+	owner?: string;
+	public?: boolean;
+	songCount: number;
+	duration: number;
+	created?: string;
+	changed?: string;
+	coverArt?: string;
+}
+
+export interface PlaylistWithSongs extends Playlist {
+	entry?: Song[];
+}
+
+export async function getPlaylists(): Promise<Playlist[]> {
+	const url = await buildApiUrl("getPlaylists");
+
+	const response = await fetch(url);
+	const data: SubsonicResponse<{
+		playlists?: { playlist?: Playlist[] };
+	}> = await response.json();
+
+	if (data["subsonic-response"].status !== "ok") {
+		throw new Error(
+			data["subsonic-response"].error?.message || "Failed to fetch playlists",
+		);
+	}
+
+	return data["subsonic-response"].playlists?.playlist ?? [];
+}
+
+export async function getPlaylist(id: string): Promise<PlaylistWithSongs> {
+	const url = await buildApiUrl("getPlaylist", { id });
+
+	const response = await fetch(url);
+	const data: SubsonicResponse<{
+		playlist?: PlaylistWithSongs;
+	}> = await response.json();
+
+	if (data["subsonic-response"].status !== "ok") {
+		throw new Error(
+			data["subsonic-response"].error?.message || "Failed to fetch playlist",
+		);
+	}
+
+	const playlist = data["subsonic-response"].playlist;
+	if (!playlist) {
+		throw new Error("Playlist not found");
+	}
+
+	return playlist;
+}
+
+export async function createPlaylist(options: {
+	name: string;
+	songId?: string[];
+}): Promise<PlaylistWithSongs> {
+	const params: Record<string, string> = { name: options.name };
+
+	const url = await buildApiUrl("createPlaylist", params);
+
+	// Add song IDs as multiple parameters
+	const urlObj = new URL(url);
+	if (options.songId) {
+		for (const id of options.songId) {
+			urlObj.searchParams.append("songId", id);
+		}
+	}
+
+	const response = await fetch(urlObj.toString());
+	const data: SubsonicResponse<{
+		playlist?: PlaylistWithSongs;
+	}> = await response.json();
+
+	if (data["subsonic-response"].status !== "ok") {
+		throw new Error(
+			data["subsonic-response"].error?.message || "Failed to create playlist",
+		);
+	}
+
+	return (
+		data["subsonic-response"].playlist ?? {
+			id: "",
+			name: options.name,
+			songCount: 0,
+			duration: 0,
+		}
+	);
+}
+
+export async function updatePlaylist(options: {
+	playlistId: string;
+	name?: string;
+	comment?: string;
+	public?: boolean;
+	songIdToAdd?: string[];
+	songIndexToRemove?: number[];
+}): Promise<void> {
+	const params: Record<string, string> = { playlistId: options.playlistId };
+	if (options.name) params.name = options.name;
+	if (options.comment !== undefined) params.comment = options.comment;
+	if (options.public !== undefined) params.public = options.public.toString();
+
+	const url = await buildApiUrl("updatePlaylist", params);
+
+	// Add arrays as multiple parameters
+	const urlObj = new URL(url);
+	if (options.songIdToAdd) {
+		for (const id of options.songIdToAdd) {
+			urlObj.searchParams.append("songIdToAdd", id);
+		}
+	}
+	if (options.songIndexToRemove) {
+		for (const idx of options.songIndexToRemove) {
+			urlObj.searchParams.append("songIndexToRemove", idx.toString());
+		}
+	}
+
+	const response = await fetch(urlObj.toString());
+	const data: SubsonicResponse<Record<string, never>> = await response.json();
+
+	if (data["subsonic-response"].status !== "ok") {
+		throw new Error(
+			data["subsonic-response"].error?.message || "Failed to update playlist",
+		);
+	}
+}
+
+export async function deletePlaylist(id: string): Promise<void> {
+	const url = await buildApiUrl("deletePlaylist", { id });
+
+	const response = await fetch(url);
+	const data: SubsonicResponse<Record<string, never>> = await response.json();
+
+	if (data["subsonic-response"].status !== "ok") {
+		throw new Error(
+			data["subsonic-response"].error?.message || "Failed to delete playlist",
+		);
+	}
+}
+
+// ============================================================================
+// Play Queue (for cross-device sync)
+// ============================================================================
+
+export interface PlayQueue {
+	entry?: Song[];
+	current?: string; // ID of the currently playing song
+	position?: number; // Position in milliseconds within the current song
+	username?: string;
+	changed?: string;
+	changedBy?: string;
+}
+
+export async function getPlayQueue(): Promise<PlayQueue | null> {
+	const url = await buildApiUrl("getPlayQueue");
+
+	const response = await fetch(url);
+	const data: SubsonicResponse<{
+		playQueue?: PlayQueue;
+	}> = await response.json();
+
+	if (data["subsonic-response"].status !== "ok") {
+		return null;
+	}
+
+	return data["subsonic-response"].playQueue ?? null;
+}
+
+export async function savePlayQueue(options: {
+	id: string[]; // IDs of songs in the play queue
+	current?: string; // ID of the currently playing song
+	position?: number; // Position in milliseconds
+}): Promise<void> {
+	const params: Record<string, string> = {};
+	if (options.current) params.current = options.current;
+	if (options.position !== undefined)
+		params.position = options.position.toString();
+
+	const url = await buildApiUrl("savePlayQueue", params);
+
+	// Add song IDs as multiple parameters
+	const urlObj = new URL(url);
+	for (const id of options.id) {
+		urlObj.searchParams.append("id", id);
+	}
+
+	const response = await fetch(urlObj.toString());
+	const data: SubsonicResponse<Record<string, never>> = await response.json();
+
+	if (data["subsonic-response"].status !== "ok") {
+		throw new Error(
+			data["subsonic-response"].error?.message || "Failed to save play queue",
+		);
+	}
+}
+
+// ============================================================================
+// Single Song / Top Songs
+// ============================================================================
+
+export async function getSong(id: string): Promise<Song> {
+	const url = await buildApiUrl("getSong", { id });
+
+	const response = await fetch(url);
+	const data: SubsonicResponse<{
+		song?: Song;
+	}> = await response.json();
+
+	if (data["subsonic-response"].status !== "ok") {
+		throw new Error(
+			data["subsonic-response"].error?.message || "Failed to fetch song",
+		);
+	}
+
+	const song = data["subsonic-response"].song;
+	if (!song) {
+		throw new Error("Song not found");
+	}
+
+	return song;
+}
+
+export async function getTopSongs(
+	artistName: string,
+	count = 50,
+): Promise<Song[]> {
+	const url = await buildApiUrl("getTopSongs", {
+		artist: artistName,
+		count: count.toString(),
+	});
+
+	const response = await fetch(url);
+	const data: SubsonicResponse<{
+		topSongs?: { song?: Song[] };
+	}> = await response.json();
+
+	if (data["subsonic-response"].status !== "ok") {
+		return [];
+	}
+
+	return data["subsonic-response"].topSongs?.song ?? [];
+}
+
+export async function getSimilarSongs(id: string, count = 50): Promise<Song[]> {
+	const url = await buildApiUrl("getSimilarSongs", {
+		id,
+		count: count.toString(),
+	});
+
+	const response = await fetch(url);
+	const data: SubsonicResponse<{
+		similarSongs?: { song?: Song[] };
+	}> = await response.json();
+
+	if (data["subsonic-response"].status !== "ok") {
+		return [];
+	}
+
+	return data["subsonic-response"].similarSongs?.song ?? [];
+}
+
+// ============================================================================
+// Ratings
+// ============================================================================
+
+export async function setRating(
+	id: string,
+	rating: 0 | 1 | 2 | 3 | 4 | 5,
+): Promise<void> {
+	const url = await buildApiUrl("setRating", {
+		id,
+		rating: rating.toString(),
+	});
+
+	const response = await fetch(url);
+	const data: SubsonicResponse<Record<string, never>> = await response.json();
+
+	if (data["subsonic-response"].status !== "ok") {
+		throw new Error(
+			data["subsonic-response"].error?.message || "Failed to set rating",
+		);
+	}
+}
+
+// ============================================================================
+// Now Playing
+// ============================================================================
+
+export interface NowPlayingEntry extends Song {
+	username?: string;
+	minutesAgo?: number;
+	playerId?: number;
+	playerName?: string;
+}
+
+export async function getNowPlaying(): Promise<NowPlayingEntry[]> {
+	const url = await buildApiUrl("getNowPlaying");
+
+	const response = await fetch(url);
+	const data: SubsonicResponse<{
+		nowPlaying?: { entry?: NowPlayingEntry[] };
+	}> = await response.json();
+
+	if (data["subsonic-response"].status !== "ok") {
+		return [];
+	}
+
+	return data["subsonic-response"].nowPlaying?.entry ?? [];
+}
+
+// ============================================================================
+// Lyrics by Song ID (OpenSubsonic extension)
+// ============================================================================
+
+export interface StructuredLyrics {
+	displayArtist?: string;
+	displayTitle?: string;
+	lang: string;
+	offset?: number;
+	synced: boolean;
+	line: Array<{
+		start?: number; // Start time in milliseconds (for synced lyrics)
+		value: string;
+	}>;
+}
+
+export async function getLyricsBySongId(
+	id: string,
+): Promise<StructuredLyrics[]> {
+	const url = await buildApiUrl("getLyricsBySongId", { id });
+
+	const response = await fetch(url);
+	const data: SubsonicResponse<{
+		lyricsList?: { structuredLyrics?: StructuredLyrics[] };
+	}> = await response.json();
+
+	if (data["subsonic-response"].status !== "ok") {
+		return [];
+	}
+
+	return data["subsonic-response"].lyricsList?.structuredLyrics ?? [];
+}
+
+// ============================================================================
+// Download URL
+// ============================================================================
+
+export async function getDownloadUrl(id: string): Promise<string> {
+	return buildApiUrl("download", { id });
+}

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Clock, Disc3, Pause, Play, Tag } from "lucide-react";
 import { useEffect, useState } from "react";
+import { AddToPlaylistButton } from "@/components/AddToPlaylistButton";
 import { MoreByArtist } from "@/components/MoreByArtist";
 import { StarButton } from "@/components/StarButton";
 import { Button } from "@/components/ui/button";
@@ -218,10 +219,11 @@ function AlbumDetailPage() {
 
 			{/* Track list */}
 			<div className="bg-card rounded-lg border">
-				<div className="grid grid-cols-[2rem_1fr_2rem_3rem] gap-4 px-4 py-2 border-b text-sm text-muted-foreground">
+				<div className="grid grid-cols-[2rem_1fr_2rem_2rem_3rem] gap-4 px-4 py-2 border-b text-sm text-muted-foreground">
 					<span className="text-center">#</span>
 					<span>Title</span>
-					{/* Empty header for star column */}
+					{/* Empty headers for star and playlist columns */}
+					<span />
 					<span />
 					<span className="flex items-center justify-end">
 						<Clock className="w-4 h-4" />
@@ -236,7 +238,7 @@ function AlbumDetailPage() {
 							<div
 								key={song.id}
 								className={cn(
-									"w-full grid grid-cols-[2rem_1fr_2rem_3rem] gap-4 px-4 py-3 hover:bg-muted/50 transition-colors group",
+									"w-full grid grid-cols-[2rem_1fr_2rem_2rem_3rem] gap-4 px-4 py-3 hover:bg-muted/50 transition-colors group",
 									isCurrentTrack && "bg-muted/30",
 								)}
 							>
@@ -309,6 +311,11 @@ function AlbumDetailPage() {
 										isStarred={!!song.starred}
 										size="sm"
 									/>
+								</div>
+
+								{/* Add to playlist */}
+								<div className="flex items-center">
+									<AddToPlaylistButton songId={song.id} song={song} size="sm" />
 								</div>
 
 								{/* Duration */}

@@ -27,6 +27,7 @@ export function SimilarArtists({ artistId }: SimilarArtistsProps) {
 				</div>
 				<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
 					{Array.from({ length: 6 }).map((_, i) => (
+						// biome-ignore lint/suspicious/noArrayIndexKey: Static skeleton placeholders never reorder
 						<div key={i} className="rounded-lg bg-card p-4 animate-pulse">
 							<div className="aspect-square rounded-full bg-muted mb-3" />
 							<div className="h-4 bg-muted rounded w-3/4 mb-2" />

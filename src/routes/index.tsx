@@ -12,8 +12,8 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 import { login as authLogin, isAuthenticated } from "@/lib/auth";
 import { ping } from "@/lib/subsonic";
@@ -48,7 +48,7 @@ function LoginPage() {
 			password: "",
 		},
 		validators: {
-			onBlur: loginSchema,
+			onSubmit: loginSchema,
 		},
 		onSubmit: async ({ value }) => {
 			setServerError(null);
@@ -104,8 +104,8 @@ function LoginPage() {
 							{/* Server URL */}
 							<form.Field name="serverUrl">
 								{(field) => (
-									<div className="space-y-2">
-										<Label htmlFor={field.name}>Server URL</Label>
+									<Field data-invalid={field.state.meta.errors.length > 0}>
+										<FieldLabel htmlFor={field.name}>Server URL</FieldLabel>
 										<div className="relative">
 											<Server className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
 											<Input
@@ -113,30 +113,26 @@ function LoginPage() {
 												type="url"
 												placeholder="https://your-server.com"
 												value={field.state.value}
-												onBlur={field.handleBlur}
 												onChange={(e) => field.handleChange(e.target.value)}
 												className="pl-10"
 											/>
 										</div>
-										{field.state.meta.isTouched &&
-											field.state.meta.errors.length > 0 && (
-												<p className="text-sm text-destructive">
-													{field.state.meta.errors
-														.map((err) =>
-															typeof err === "string" ? err : err?.message,
-														)
-														.join(", ")}
-												</p>
-											)}
-									</div>
+										{field.state.meta.errors.length > 0 && (
+											<FieldError
+												errors={field.state.meta.errors.map((err) => ({
+													message: typeof err === "string" ? err : err?.message,
+												}))}
+											/>
+										)}
+									</Field>
 								)}
 							</form.Field>
 
 							{/* Username */}
 							<form.Field name="username">
 								{(field) => (
-									<div className="space-y-2">
-										<Label htmlFor={field.name}>Username</Label>
+									<Field data-invalid={field.state.meta.errors.length > 0}>
+										<FieldLabel htmlFor={field.name}>Username</FieldLabel>
 										<div className="relative">
 											<User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
 											<Input
@@ -144,30 +140,26 @@ function LoginPage() {
 												type="text"
 												placeholder="Enter your username"
 												value={field.state.value}
-												onBlur={field.handleBlur}
 												onChange={(e) => field.handleChange(e.target.value)}
 												className="pl-10"
 											/>
 										</div>
-										{field.state.meta.isTouched &&
-											field.state.meta.errors.length > 0 && (
-												<p className="text-sm text-destructive">
-													{field.state.meta.errors
-														.map((err) =>
-															typeof err === "string" ? err : err?.message,
-														)
-														.join(", ")}
-												</p>
-											)}
-									</div>
+										{field.state.meta.errors.length > 0 && (
+											<FieldError
+												errors={field.state.meta.errors.map((err) => ({
+													message: typeof err === "string" ? err : err?.message,
+												}))}
+											/>
+										)}
+									</Field>
 								)}
 							</form.Field>
 
 							{/* Password */}
 							<form.Field name="password">
 								{(field) => (
-									<div className="space-y-2">
-										<Label htmlFor={field.name}>Password</Label>
+									<Field data-invalid={field.state.meta.errors.length > 0}>
+										<FieldLabel htmlFor={field.name}>Password</FieldLabel>
 										<div className="relative">
 											<Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
 											<Input
@@ -175,22 +167,18 @@ function LoginPage() {
 												type="password"
 												placeholder="Enter your password"
 												value={field.state.value}
-												onBlur={field.handleBlur}
 												onChange={(e) => field.handleChange(e.target.value)}
 												className="pl-10"
 											/>
 										</div>
-										{field.state.meta.isTouched &&
-											field.state.meta.errors.length > 0 && (
-												<p className="text-sm text-destructive">
-													{field.state.meta.errors
-														.map((err) =>
-															typeof err === "string" ? err : err?.message,
-														)
-														.join(", ")}
-												</p>
-											)}
-									</div>
+										{field.state.meta.errors.length > 0 && (
+											<FieldError
+												errors={field.state.meta.errors.map((err) => ({
+													message: typeof err === "string" ? err : err?.message,
+												}))}
+											/>
+										)}
+									</Field>
 								)}
 							</form.Field>
 

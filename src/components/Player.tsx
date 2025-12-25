@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import {
 	Disc3,
 	FileText,
@@ -15,6 +16,7 @@ import {
 	X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { AddToPlaylistButton } from "@/components/AddToPlaylistButton";
 import { LyricsPanel } from "@/components/LyricsPanel";
 import { StarButton } from "@/components/StarButton";
 import { Button } from "@/components/ui/button";
@@ -156,7 +158,11 @@ export function Player() {
 			{/* Mobile: Top row with track info and controls */}
 			<div className="flex items-center gap-3 sm:flex-1 sm:basis-0 min-w-0">
 				{/* Track cover - smaller on mobile */}
-				<div className="w-10 h-10 sm:w-14 sm:h-14 rounded-md overflow-hidden bg-muted flex-shrink-0">
+				<Link
+					to={currentTrack.albumId ? "/app/albums/$albumId" : "/"}
+					params={currentTrack.albumId ? { albumId: currentTrack.albumId } : {}}
+					className="w-10 h-10 sm:w-14 sm:h-14 rounded-md overflow-hidden bg-muted flex-shrink-0 block hover:opacity-80 transition-opacity"
+				>
 					{coverUrl ? (
 						<img
 							src={coverUrl}
@@ -168,14 +174,26 @@ export function Player() {
 							<Disc3 className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground" />
 						</div>
 					)}
-				</div>
+				</Link>
 				<div className="min-w-0 flex-1">
-					<p className="font-medium text-sm text-foreground truncate">
+					<Link
+						to={currentTrack.albumId ? "/app/albums/$albumId" : "/"}
+						params={
+							currentTrack.albumId ? { albumId: currentTrack.albumId } : {}
+						}
+						className="font-medium text-sm text-foreground truncate hover:text-primary transition-colors block"
+					>
 						{currentTrack.title}
-					</p>
-					<p className="text-xs text-muted-foreground truncate">
+					</Link>
+					<Link
+						to={currentTrack.artistId ? "/app/artists/$artistId" : "/"}
+						params={
+							currentTrack.artistId ? { artistId: currentTrack.artistId } : {}
+						}
+						className="text-xs text-muted-foreground truncate hover:text-primary transition-colors block"
+					>
 						{currentTrack.artist}
-					</p>
+					</Link>
 				</div>
 
 				{/* Mobile-only: Compact controls next to track info */}
@@ -327,6 +345,19 @@ export function Player() {
 					id={currentTrack.id}
 					type="song"
 					isStarred={!!currentTrack.starred}
+					size="sm"
+				/>
+				<AddToPlaylistButton
+					songId={currentTrack.id}
+					song={{
+						id: currentTrack.id,
+						title: currentTrack.title,
+						artist: currentTrack.artist,
+						album: currentTrack.album,
+						albumId: currentTrack.albumId,
+						duration: currentTrack.duration,
+						coverArt: currentTrack.coverArt,
+					}}
 					size="sm"
 				/>
 				<Button

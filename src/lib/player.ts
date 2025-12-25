@@ -1,6 +1,12 @@
 import { useSyncExternalStore } from "react";
 import type { Song } from "./api";
-import { getCoverArtUrl, getStreamUrl, scrobble } from "./api";
+import {
+	getCoverArtUrl,
+	getPlayQueue,
+	getStreamUrl,
+	savePlayQueue,
+	scrobble,
+} from "./api";
 
 // Media Session API support
 if ("mediaSession" in navigator) {
@@ -176,6 +182,37 @@ function getAudio(): HTMLAudioElement {
 	return audio;
 }
 
+// ============================================================================
+// Play Queue Sync (cross-device) - declarations before use
+// ============================================================================
+
+// Debounce timer for saving queue
+let saveQueueTimeout: ReturnType<typeof setTimeout> | null = null;
+let queueSyncEnabled = false;
+
+// Save current queue to server (debounced)
+function debouncedSaveQueue() {
+	if (!queueSyncEnabled) return;
+
+	if (saveQueueTimeout) {
+		clearTimeout(saveQueueTimeout);
+	}
+
+	saveQueueTimeout = setTimeout(() => {
+		const { queue, currentTrack, currentTime } = playerState;
+		if (queue.length === 0) return;
+
+		const songIds = queue.map((s) => s.id);
+		savePlayQueue({
+			id: songIds,
+			current: currentTrack?.id,
+			position: Math.floor(currentTime * 1000), // Convert to milliseconds
+		}).catch((err) => {
+			console.error("Failed to save play queue:", err);
+		});
+	}, 2000); // Save after 2 seconds of inactivity
+}
+
 // Player actions
 export async function playSong(
 	song: Song,
@@ -198,6 +235,9 @@ export async function playSong(
 		queueIndex: startIndex ?? 0,
 		isLoading: true,
 	});
+
+	// Trigger queue sync
+	debouncedSaveQueue();
 
 	try {
 		const streamUrl = await getStreamUrl(song.id);
@@ -375,6 +415,81 @@ export function toggleRepeat() {
 
 export function setRepeat(mode: RepeatMode) {
 	updateState({ repeat: mode });
+}
+
+// Save queue immediately (for page unload)
+export function saveQueueNow(): Promise<void> {
+	const { queue, currentTrack, currentTime } = playerState;
+	if (queue.length === 0) return Promise.resolve();
+
+	const songIds = queue.map((s) => s.id);
+	return savePlayQueue({
+		id: songIds,
+		current: currentTrack?.id,
+		position: Math.floor(currentTime * 1000),
+	});
+}
+
+// Restore queue from server
+export async function restoreQueue(): Promise<boolean> {
+	try {
+		const playQueue = await getPlayQueue();
+		if (!playQueue?.entry || playQueue.entry.length === 0) {
+			return false;
+		}
+
+		const songs = playQueue.entry;
+		const currentId = playQueue.current;
+		const positionMs = playQueue.position ?? 0;
+
+		// Find the current song index
+		let currentIndex = 0;
+		if (currentId) {
+			const idx = songs.findIndex((s) => s.id === currentId);
+			if (idx >= 0) currentIndex = idx;
+		}
+
+		// Update state with restored queue (don't auto-play)
+		updateState({
+			queue: songs,
+			originalQueue: songs,
+			currentTrack: songs[currentIndex],
+			queueIndex: currentIndex,
+			currentTime: positionMs / 1000, // Convert from milliseconds
+		});
+
+		// Prepare audio element but don't play
+		const audioEl = getAudio();
+		const streamUrl = await getStreamUrl(songs[currentIndex].id);
+		audioEl.src = streamUrl;
+		audioEl.currentTime = positionMs / 1000;
+
+		// Update media session
+		updateMediaSession(songs[currentIndex]);
+
+		return true;
+	} catch (err) {
+		console.error("Failed to restore play queue:", err);
+		return false;
+	}
+}
+
+// Enable queue sync - call this after user is authenticated
+export function enableQueueSync() {
+	if (queueSyncEnabled) return;
+	queueSyncEnabled = true;
+
+	// Save queue on page unload
+	window.addEventListener("beforeunload", () => {
+		if (playerState.queue.length > 0) {
+			saveQueueNow();
+		}
+	});
+}
+
+// Check if queue sync is enabled
+export function isQueueSyncEnabled(): boolean {
+	return queueSyncEnabled;
 }
 
 // Cover art URL cache
