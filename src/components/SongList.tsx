@@ -5,6 +5,7 @@ import type { Song } from "@/lib/api";
 import { getCoverArtUrl } from "@/lib/api";
 import { playSong, usePlayer } from "@/lib/player";
 import { cn } from "@/lib/utils";
+import { StarButton } from "./StarButton";
 
 function formatDuration(seconds: number): string {
 	const mins = Math.floor(seconds / 60);
@@ -48,19 +49,21 @@ function SongRow({
 	};
 
 	return (
-		<button
-			type="button"
-			onClick={handlePlay}
+		<div
 			className={cn(
-				"w-full grid gap-4 px-4 py-2 hover:bg-muted/50 transition-colors group text-left",
+				"w-full grid gap-4 px-4 py-2 hover:bg-muted/50 transition-colors group",
 				showAlbum
-					? "grid-cols-[auto_1fr_auto] sm:grid-cols-[auto_1fr_1fr_auto]"
-					: "grid-cols-[auto_1fr_auto]",
+					? "grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_1fr_1fr_auto_auto]"
+					: "grid-cols-[auto_1fr_auto_auto]",
 				isCurrentTrack && "bg-muted/30",
 			)}
 		>
 			{/* Play indicator / track number */}
-			<div className="w-8 flex items-center justify-center">
+			<button
+				type="button"
+				onClick={handlePlay}
+				className="w-8 flex items-center justify-center"
+			>
 				{isThisTrackPlaying ? (
 					<span className="w-3 h-3 flex gap-0.5 items-end">
 						<span className="w-0.5 h-2 bg-primary animate-pulse" />
@@ -91,10 +94,14 @@ function SongRow({
 						/>
 					</>
 				)}
-			</div>
+			</button>
 
 			{/* Song info */}
-			<div className="flex items-center gap-3 min-w-0">
+			<button
+				type="button"
+				onClick={handlePlay}
+				className="flex items-center gap-3 min-w-0 text-left"
+			>
 				{coverUrl ? (
 					<img
 						src={coverUrl}
@@ -121,7 +128,7 @@ function SongRow({
 						</p>
 					)}
 				</div>
-			</div>
+			</button>
 
 			{/* Album */}
 			{showAlbum && (
@@ -130,13 +137,23 @@ function SongRow({
 				</div>
 			)}
 
+			{/* Star button */}
+			<div className="flex items-center">
+				<StarButton
+					id={song.id}
+					type="song"
+					isStarred={!!song.starred}
+					size="sm"
+				/>
+			</div>
+
 			{/* Duration */}
 			<div className="flex items-center">
 				<span className="text-sm text-muted-foreground">
 					{song.duration ? formatDuration(song.duration) : "—"}
 				</span>
 			</div>
-		</button>
+		</div>
 	);
 }
 
@@ -193,13 +210,15 @@ export function SongList({
 					className={cn(
 						"grid gap-4 px-4 py-2 border-b text-sm text-muted-foreground",
 						showAlbum
-							? "grid-cols-[auto_1fr_auto] sm:grid-cols-[auto_1fr_1fr_auto]"
-							: "grid-cols-[auto_1fr_auto]",
+							? "grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_1fr_1fr_auto_auto]"
+							: "grid-cols-[auto_1fr_auto_auto]",
 					)}
 				>
 					<span className="w-8 text-center">#</span>
 					<span>Title</span>
 					{showAlbum && <span className="hidden sm:block">Album</span>}
+					{/* Empty header for star column */}
+					<span />
 					<span className="flex items-center gap-1">
 						<Clock className="w-4 h-4" />
 					</span>

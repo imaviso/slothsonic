@@ -1,9 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Disc3, Music, Users } from "lucide-react";
+import { Disc3, Heart, History, Music, TrendingUp, Users } from "lucide-react";
 
 import { AlbumGrid } from "@/components/AlbumCard";
-import { getAlbumList, getArtists, getRandomSongs } from "@/lib/api";
+import { SongList } from "@/components/SongList";
+import {
+	getAlbumList,
+	getArtists,
+	getRandomSongs,
+	getStarred,
+} from "@/lib/api";
 
 export const Route = createFileRoute("/app/")({
 	component: AppHome,
@@ -24,6 +30,25 @@ function AppHome() {
 		queryKey: ["randomSongs"],
 		queryFn: () => getRandomSongs(1),
 	});
+
+	// Starred/Favorites
+	const { data: starred, isLoading: loadingStarred } = useQuery({
+		queryKey: ["starred"],
+		queryFn: getStarred,
+	});
+
+	// Most played albums
+	const { data: frequentAlbums, isLoading: loadingFrequent } = useQuery({
+		queryKey: ["albums", "frequent"],
+		queryFn: () => getAlbumList("frequent", 12),
+	});
+
+	// Recently played albums
+	const { data: recentlyPlayedAlbums, isLoading: loadingRecentlyPlayed } =
+		useQuery({
+			queryKey: ["albums", "recent"],
+			queryFn: () => getAlbumList("recent", 12),
+		});
 
 	return (
 		<div className="p-6 space-y-8">
@@ -54,7 +79,73 @@ function AppHome() {
 				/>
 			</div>
 
-			{/* Recent Albums */}
+			{/* Favorites/Starred Songs */}
+			{(loadingStarred || (starred?.songs && starred.songs.length > 0)) && (
+				<section>
+					<div className="flex items-center gap-2 mb-4">
+						<Heart className="w-5 h-5 text-primary" />
+						<h2 className="text-xl font-semibold text-foreground">
+							Favorite Songs
+						</h2>
+					</div>
+					<SongList
+						songs={starred?.songs?.slice(0, 5) ?? []}
+						isLoading={loadingStarred}
+						showHeader={false}
+					/>
+				</section>
+			)}
+
+			{/* Starred Albums */}
+			{(loadingStarred || (starred?.albums && starred.albums.length > 0)) && (
+				<section>
+					<div className="flex items-center gap-2 mb-4">
+						<Heart className="w-5 h-5 text-primary" />
+						<h2 className="text-xl font-semibold text-foreground">
+							Favorite Albums
+						</h2>
+					</div>
+					<AlbumGrid
+						albums={starred?.albums?.slice(0, 12) ?? []}
+						isLoading={loadingStarred}
+					/>
+				</section>
+			)}
+
+			{/* Most Played */}
+			{(loadingFrequent || (frequentAlbums && frequentAlbums.length > 0)) && (
+				<section>
+					<div className="flex items-center gap-2 mb-4">
+						<TrendingUp className="w-5 h-5 text-primary" />
+						<h2 className="text-xl font-semibold text-foreground">
+							Most Played
+						</h2>
+					</div>
+					<AlbumGrid
+						albums={frequentAlbums ?? []}
+						isLoading={loadingFrequent}
+					/>
+				</section>
+			)}
+
+			{/* Recently Played */}
+			{(loadingRecentlyPlayed ||
+				(recentlyPlayedAlbums && recentlyPlayedAlbums.length > 0)) && (
+				<section>
+					<div className="flex items-center gap-2 mb-4">
+						<History className="w-5 h-5 text-primary" />
+						<h2 className="text-xl font-semibold text-foreground">
+							Recently Played
+						</h2>
+					</div>
+					<AlbumGrid
+						albums={recentlyPlayedAlbums ?? []}
+						isLoading={loadingRecentlyPlayed}
+					/>
+				</section>
+			)}
+
+			{/* Recently Added Albums */}
 			<section>
 				<div className="flex items-center justify-between mb-4">
 					<h2 className="text-xl font-semibold text-foreground">

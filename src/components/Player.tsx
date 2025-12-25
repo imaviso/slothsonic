@@ -1,5 +1,6 @@
 import {
 	Disc3,
+	ListMusic,
 	Loader2,
 	Pause,
 	Play,
@@ -7,9 +8,11 @@ import {
 	SkipForward,
 	Volume2,
 	VolumeX,
+	X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { StarButton } from "@/components/StarButton";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { getTrackCoverUrl, usePlayer } from "@/lib/player";
@@ -25,6 +28,8 @@ function formatTime(seconds: number): string {
 export function Player() {
 	const {
 		currentTrack,
+		queue,
+		queueIndex,
 		isPlaying,
 		isLoading,
 		currentTime,
@@ -35,12 +40,14 @@ export function Player() {
 		playPrevious,
 		seek,
 		setVolume,
+		playSong,
 	} = usePlayer();
 
 	const [coverUrl, setCoverUrl] = useState<string | null>(null);
 	const [isSeeking, setIsSeeking] = useState(false);
 	const [seekValue, setSeekValue] = useState(0);
 	const [prevVolume, setPrevVolume] = useState(1);
+	const [showQueue, setShowQueue] = useState(false);
 
 	useEffect(() => {
 		if (currentTrack?.coverArt) {
@@ -79,7 +86,7 @@ export function Player() {
 	};
 
 	return (
-		<div className="border-t bg-card px-3 py-2 sm:px-4 sm:py-0 sm:h-20 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+		<div className="relative border-t bg-card px-3 py-2 sm:px-4 sm:py-0 sm:h-20 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
 			{/* Mobile: Top row with track info and controls */}
 			<div className="flex items-center gap-3 sm:flex-1 sm:basis-0 min-w-0">
 				{/* Track cover - smaller on mobile */}
@@ -220,8 +227,23 @@ export function Player() {
 				</span>
 			</div>
 
-			{/* Volume control - hidden on mobile */}
+			{/* Favorite, queue, and volume controls - hidden on mobile */}
 			<div className="hidden sm:flex items-center justify-end gap-2 sm:flex-1 sm:basis-0">
+				<StarButton
+					id={currentTrack.id}
+					type="song"
+					isStarred={!!currentTrack.starred}
+					size="sm"
+				/>
+				<Button
+					variant="ghost"
+					size="icon"
+					className={cn("w-8 h-8", showQueue && "text-primary")}
+					onClick={() => setShowQueue(!showQueue)}
+					title="View queue"
+				>
+					<ListMusic className="w-4 h-4" />
+				</Button>
 				<Button
 					variant="ghost"
 					size="icon"
@@ -243,6 +265,68 @@ export function Player() {
 					className="w-24"
 				/>
 			</div>
+
+			{/* Queue panel */}
+			{showQueue && (
+				<div className="absolute bottom-full right-0 mb-2 w-80 max-h-96 bg-card border rounded-lg shadow-lg overflow-hidden">
+					<div className="flex items-center justify-between px-4 py-2 border-b">
+						<h3 className="font-medium text-sm">Queue</h3>
+						<Button
+							variant="ghost"
+							size="icon"
+							className="w-6 h-6"
+							onClick={() => setShowQueue(false)}
+						>
+							<X className="w-4 h-4" />
+						</Button>
+					</div>
+					<div className="overflow-y-auto max-h-80 scrollbar-thin">
+						{queue.length === 0 ? (
+							<div className="p-4 text-center text-sm text-muted-foreground">
+								Queue is empty
+							</div>
+						) : (
+							<div className="divide-y">
+								{queue.map((song, index) => (
+									<button
+										type="button"
+										key={`${song.id}-${index}`}
+										onClick={() => playSong(song, queue, index)}
+										className={cn(
+											"w-full flex items-center gap-3 px-4 py-2 hover:bg-muted/50 transition-colors text-left",
+											index === queueIndex && "bg-muted/30",
+										)}
+									>
+										<span
+											className={cn(
+												"w-5 text-xs text-muted-foreground",
+												index === queueIndex && "text-primary font-medium",
+											)}
+										>
+											{index + 1}
+										</span>
+										<div className="min-w-0 flex-1">
+											<p
+												className={cn(
+													"text-sm truncate",
+													index === queueIndex
+														? "text-primary font-medium"
+														: "text-foreground",
+												)}
+											>
+												{song.title}
+											</p>
+											<p className="text-xs text-muted-foreground truncate">
+												{song.artist}
+											</p>
+										</div>
+									</button>
+								))}
+							</div>
+						)}
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

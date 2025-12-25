@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { Album } from "@/lib/api";
 import { getCoverArtUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { StarButton } from "./StarButton";
 
 interface AlbumCardProps {
 	album: Album;
@@ -31,7 +32,7 @@ export function AlbumCard({ album, className }: AlbumCardProps) {
 			)}
 		>
 			{/* Album Cover */}
-			<div className="aspect-square rounded-md overflow-hidden bg-muted mb-3">
+			<div className="aspect-square rounded-md overflow-hidden bg-muted mb-3 relative">
 				{coverUrl && !imageError ? (
 					<img
 						src={coverUrl}
@@ -44,6 +45,15 @@ export function AlbumCard({ album, className }: AlbumCardProps) {
 						<Disc3 className="w-12 h-12 text-muted-foreground" />
 					</div>
 				)}
+				{/* Star button overlay */}
+				<div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+					<StarButton
+						id={album.id}
+						type="album"
+						isStarred={!!album.starred}
+						size="sm"
+					/>
+				</div>
 			</div>
 
 			{/* Album Info */}

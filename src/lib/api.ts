@@ -12,6 +12,7 @@ export interface Album {
 	year?: number;
 	genre?: string;
 	created?: string;
+	starred?: string; // ISO date string if starred
 }
 
 export interface Artist {
@@ -19,6 +20,7 @@ export interface Artist {
 	name: string;
 	coverArt?: string;
 	albumCount?: number;
+	starred?: string; // ISO date string if starred
 }
 
 export interface Song {
@@ -37,6 +39,7 @@ export interface Song {
 	contentType?: string;
 	suffix?: string;
 	path?: string;
+	starred?: string; // ISO date string if starred
 }
 
 export interface SubsonicResponse<T> {
@@ -220,6 +223,39 @@ export async function search(query: string): Promise<SearchResult> {
 	};
 }
 
+// Get starred/favorite items
+export interface StarredResult {
+	artists: Artist[];
+	albums: Album[];
+	songs: Song[];
+}
+
+export async function getStarred(): Promise<StarredResult> {
+	const url = await buildApiUrl("getStarred2");
+
+	const response = await fetch(url);
+	const data: SubsonicResponse<{
+		starred2?: {
+			artist?: Artist[];
+			album?: Album[];
+			song?: Song[];
+		};
+	}> = await response.json();
+
+	if (data["subsonic-response"].status !== "ok") {
+		throw new Error(
+			data["subsonic-response"].error?.message || "Failed to fetch starred",
+		);
+	}
+
+	const result = data["subsonic-response"].starred2;
+	return {
+		artists: result?.artist ?? [],
+		albums: result?.album ?? [],
+		songs: result?.song ?? [],
+	};
+}
+
 // URL builders for media
 
 export async function getCoverArtUrl(
@@ -235,4 +271,70 @@ export async function getCoverArtUrl(
 
 export async function getStreamUrl(songId: string): Promise<string> {
 	return buildApiUrl("stream", { id: songId });
+}
+
+// Star/Unstar items
+export async function star(options: {
+	id?: string;
+	albumId?: string;
+	artistId?: string;
+}): Promise<void> {
+	const params: Record<string, string> = {};
+	if (options.id) params.id = options.id;
+	if (options.albumId) params.albumId = options.albumId;
+	if (options.artistId) params.artistId = options.artistId;
+
+	const url = await buildApiUrl("star", params);
+	const response = await fetch(url);
+	const data: SubsonicResponse<Record<string, never>> = await response.json();
+
+	if (data["subsonic-response"].status !== "ok") {
+		throw new Error(
+			data["subsonic-response"].error?.message || "Failed to star item",
+		);
+	}
+}
+
+export async function unstar(options: {
+	id?: string;
+	albumId?: string;
+	artistId?: string;
+}): Promise<void> {
+	const params: Record<string, string> = {};
+	if (options.id) params.id = options.id;
+	if (options.albumId) params.albumId = options.albumId;
+	if (options.artistId) params.artistId = options.artistId;
+
+	const url = await buildApiUrl("unstar", params);
+	const response = await fetch(url);
+	const data: SubsonicResponse<Record<string, never>> = await response.json();
+
+	if (data["subsonic-response"].status !== "ok") {
+		throw new Error(
+			data["subsonic-response"].error?.message || "Failed to unstar item",
+		);
+	}
+}
+
+// Scrobble - report playback to server
+export async function scrobble(
+	id: string,
+	options?: { submission?: boolean },
+): Promise<void> {
+	const params: Record<string, string> = { id };
+	// submission=true means the song has finished playing (or played enough to count)
+	// submission=false means "now playing" update
+	if (options?.submission !== undefined) {
+		params.submission = options.submission.toString();
+	}
+
+	const url = await buildApiUrl("scrobble", params);
+	const response = await fetch(url);
+	const data: SubsonicResponse<Record<string, never>> = await response.json();
+
+	if (data["subsonic-response"].status !== "ok") {
+		throw new Error(
+			data["subsonic-response"].error?.message || "Failed to scrobble",
+		);
+	}
 }

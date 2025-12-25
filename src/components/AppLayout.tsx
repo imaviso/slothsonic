@@ -101,9 +101,9 @@ export function AppLayout({ children }: AppLayoutProps) {
 				</ul>
 			</nav>
 
-			{/* User section */}
-			<div className="p-4 border-t">
-				<div className="flex items-center justify-between">
+			{/* User section - matches player height */}
+			<div className="px-4 border-t h-20 flex items-center">
+				<div className="flex items-center justify-between w-full">
 					<div className="flex items-center gap-2 min-w-0">
 						<div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
 							<span className="text-xs font-medium text-muted-foreground">

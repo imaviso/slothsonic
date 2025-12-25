@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { Artist } from "@/lib/api";
 import { getCoverArtUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { StarButton } from "./StarButton";
 
 interface ArtistCardProps {
 	artist: Artist;
@@ -31,7 +32,7 @@ export function ArtistCard({ artist, className }: ArtistCardProps) {
 			)}
 		>
 			{/* Artist Image */}
-			<div className="aspect-square rounded-full overflow-hidden bg-muted mb-3">
+			<div className="aspect-square rounded-full overflow-hidden bg-muted mb-3 relative">
 				{coverUrl && !imageError ? (
 					<img
 						src={coverUrl}
@@ -44,6 +45,15 @@ export function ArtistCard({ artist, className }: ArtistCardProps) {
 						<User className="w-12 h-12 text-muted-foreground" />
 					</div>
 				)}
+				{/* Star button overlay */}
+				<div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+					<StarButton
+						id={artist.id}
+						type="artist"
+						isStarred={!!artist.starred}
+						size="sm"
+					/>
+				</div>
 			</div>
 
 			{/* Artist Info */}

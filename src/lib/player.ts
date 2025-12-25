@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { Song } from "./api";
-import { getCoverArtUrl, getStreamUrl } from "./api";
+import { getCoverArtUrl, getStreamUrl, scrobble } from "./api";
 
 export interface PlayerState {
 	currentTrack: Song | null;
@@ -28,6 +28,10 @@ let playerState: PlayerState = { ...initialState };
 let audio: HTMLAudioElement | null = null;
 const listeners = new Set<() => void>();
 
+// Track scrobbling state - we only scrobble once per song play
+let scrobbledTrackId: string | null = null;
+let nowPlayingReported: string | null = null;
+
 function emitChange() {
 	for (const listener of listeners) {
 		listener();
@@ -47,6 +51,26 @@ function getAudio(): HTMLAudioElement {
 
 		audio.addEventListener("timeupdate", () => {
 			updateState({ currentTime: audio?.currentTime ?? 0 });
+
+			// Check if we should scrobble (submission)
+			// Scrobble after 4 minutes or 50% of the song, whichever comes first
+			const currentTrack = playerState.currentTrack;
+			const currentTime = audio?.currentTime ?? 0;
+			const duration = audio?.duration ?? 0;
+
+			if (
+				currentTrack &&
+				currentTrack.id !== scrobbledTrackId &&
+				duration > 0
+			) {
+				const scrobbleThreshold = Math.min(240, duration * 0.5); // 4 min or 50%
+				if (currentTime >= scrobbleThreshold) {
+					scrobbledTrackId = currentTrack.id;
+					scrobble(currentTrack.id, { submission: true }).catch((err) => {
+						console.error("Failed to scrobble:", err);
+					});
+				}
+			}
 		});
 
 		audio.addEventListener("durationchange", () => {
@@ -89,6 +113,9 @@ export async function playSong(
 ) {
 	const audioEl = getAudio();
 
+	// Reset scrobble state for new song
+	scrobbledTrackId = null;
+
 	updateState({
 		currentTrack: song,
 		queue: queue ?? [song],
@@ -100,6 +127,14 @@ export async function playSong(
 		const streamUrl = await getStreamUrl(song.id);
 		audioEl.src = streamUrl;
 		await audioEl.play();
+
+		// Report "now playing" if not already reported for this song
+		if (nowPlayingReported !== song.id) {
+			nowPlayingReported = song.id;
+			scrobble(song.id, { submission: false }).catch((err) => {
+				console.error("Failed to report now playing:", err);
+			});
+		}
 	} catch (error) {
 		console.error("Failed to play song:", error);
 		updateState({ isLoading: false });
