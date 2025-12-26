@@ -214,12 +214,10 @@ export function Player() {
 		return null;
 	}
 
-	const handleSeekStart = () => {
-		setIsSeeking(true);
-		setSeekValue(currentTime);
-	};
-
 	const handleSeekChange = (value: number[]) => {
+		if (!isSeeking) {
+			setIsSeeking(true);
+		}
 		setSeekValue(value[0]);
 	};
 
@@ -390,7 +388,6 @@ export function Player() {
 						min={0}
 						max={duration || 100}
 						step={1}
-						onPointerDown={handleSeekStart}
 						onValueChange={handleSeekChange}
 						onValueCommit={handleSeekEnd}
 						className={cn("flex-1", !duration && "opacity-50")}
@@ -412,7 +409,6 @@ export function Player() {
 					min={0}
 					max={duration || 100}
 					step={1}
-					onPointerDown={handleSeekStart}
 					onValueChange={handleSeekChange}
 					onValueCommit={handleSeekEnd}
 					className={cn("flex-1", !duration && "opacity-50")}

@@ -363,6 +363,8 @@ export async function playPrevious() {
 export function seek(time: number) {
 	const audioEl = getAudio();
 	if (audioEl.src) {
+		// Update state immediately for smooth UI
+		updateState({ currentTime: time });
 		audioEl.currentTime = time;
 	}
 }
