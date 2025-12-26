@@ -1,7 +1,8 @@
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ListMusic, Loader2, Music, Plus, Trash2 } from "lucide-react";
+import { ListMusic, Loader2, MoreHorizontal, Music, Plus } from "lucide-react";
+import * as React from "react";
 import { useEffect, useState } from "react";
 import * as v from "valibot";
 
@@ -20,12 +21,10 @@ import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
 	createPlaylist,
-	deletePlaylist,
 	getCoverArtUrl,
 	getPlaylists,
 	type Playlist,
 } from "@/lib/api";
-import { cn } from "@/lib/utils";
 
 const createPlaylistSchema = v.object({
 	name: v.pipe(
@@ -51,12 +50,11 @@ function formatDuration(seconds: number): string {
 
 interface PlaylistCardProps {
 	playlist: Playlist;
-	onDelete: (id: string) => void;
-	isDeleting: boolean;
 }
 
-function PlaylistCard({ playlist, onDelete, isDeleting }: PlaylistCardProps) {
+function PlaylistCard({ playlist }: PlaylistCardProps) {
 	const [coverUrl, setCoverUrl] = useState<string | null>(null);
+	const cardRef = React.useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
 		if (playlist.coverArt) {
@@ -64,9 +62,27 @@ function PlaylistCard({ playlist, onDelete, isDeleting }: PlaylistCardProps) {
 		}
 	}, [playlist.coverArt]);
 
+	const handleOpenContextMenu = (e: React.MouseEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		// Dispatch a context menu event on the card to trigger the PlaylistContextMenu
+		if (cardRef.current) {
+			const contextMenuEvent = new MouseEvent("contextmenu", {
+				bubbles: true,
+				cancelable: true,
+				clientX: e.clientX,
+				clientY: e.clientY,
+			});
+			cardRef.current.dispatchEvent(contextMenuEvent);
+		}
+	};
+
 	return (
 		<PlaylistContextMenu playlist={playlist}>
-			<div className="group relative rounded-lg bg-card p-3 hover:bg-muted/50 transition-colors">
+			<div
+				ref={cardRef}
+				className="group relative rounded-lg bg-card p-3 hover:bg-muted/50 transition-colors"
+			>
 				<Link
 					to="/app/playlists/$playlistId"
 					params={{ playlistId: playlist.id }}
@@ -95,23 +111,11 @@ function PlaylistCard({ playlist, onDelete, isDeleting }: PlaylistCardProps) {
 				<Button
 					variant="ghost"
 					size="icon"
-					className={cn(
-						"absolute top-2 right-2 w-8 h-8 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-destructive hover:text-destructive-foreground",
-						isDeleting && "opacity-100",
-					)}
-					onClick={(e) => {
-						e.preventDefault();
-						e.stopPropagation();
-						onDelete(playlist.id);
-					}}
-					disabled={isDeleting}
-					title="Delete playlist"
+					className="absolute top-2 right-2 w-8 h-8 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-muted"
+					onClick={handleOpenContextMenu}
+					title="More options"
 				>
-					{isDeleting ? (
-						<Loader2 className="w-4 h-4 animate-spin" />
-					) : (
-						<Trash2 className="w-4 h-4" />
-					)}
+					<MoreHorizontal className="w-4 h-4" />
 				</Button>
 			</div>
 		</PlaylistContextMenu>
@@ -120,7 +124,6 @@ function PlaylistCard({ playlist, onDelete, isDeleting }: PlaylistCardProps) {
 
 function PlaylistsPage() {
 	const [dialogOpen, setDialogOpen] = useState(false);
-	const [deletingId, setDeletingId] = useState<string | null>(null);
 	const queryClient = useQueryClient();
 
 	const { data: playlists, isLoading } = useQuery({
@@ -137,17 +140,6 @@ function PlaylistsPage() {
 		},
 	});
 
-	const deleteMutation = useMutation({
-		mutationFn: deletePlaylist,
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["playlists"] });
-			setDeletingId(null);
-		},
-		onError: () => {
-			setDeletingId(null);
-		},
-	});
-
 	const form = useForm({
 		defaultValues: {
 			name: "",
@@ -159,13 +151,6 @@ function PlaylistsPage() {
 			createMutation.mutate(value.name.trim());
 		},
 	});
-
-	const handleDelete = (id: string) => {
-		if (confirm("Are you sure you want to delete this playlist?")) {
-			setDeletingId(id);
-			deleteMutation.mutate(id);
-		}
-	};
 
 	return (
 		<div className="p-6 space-y-6">
@@ -284,12 +269,7 @@ function PlaylistsPage() {
 			) : (
 				<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
 					{playlists.map((playlist) => (
-						<PlaylistCard
-							key={playlist.id}
-							playlist={playlist}
-							onDelete={handleDelete}
-							isDeleting={deletingId === playlist.id}
-						/>
+						<PlaylistCard key={playlist.id} playlist={playlist} />
 					))}
 				</div>
 			)}
