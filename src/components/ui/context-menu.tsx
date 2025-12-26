@@ -11,10 +11,78 @@ function ContextMenu({
 }
 
 function ContextMenuTrigger({
+  children,
+  className,
   ...props
 }: React.ComponentProps<typeof ContextMenuPrimitive.Trigger>) {
+  const triggerRef = React.useRef<HTMLSpanElement>(null)
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const touchStartRef = React.useRef<{ x: number; y: number } | null>(null)
+
+  const clearTimer = React.useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+  }, [])
+
+  const handleTouchStart = React.useCallback(
+    (e: React.TouchEvent) => {
+      const touch = e.touches[0]
+      touchStartRef.current = { x: touch.clientX, y: touch.clientY }
+
+      timerRef.current = setTimeout(() => {
+        // Trigger context menu by dispatching a synthetic contextmenu event
+        if (triggerRef.current) {
+          const rect = triggerRef.current.getBoundingClientRect()
+          const contextMenuEvent = new MouseEvent("contextmenu", {
+            bubbles: true,
+            cancelable: true,
+            clientX: touchStartRef.current?.x ?? rect.left + rect.width / 2,
+            clientY: touchStartRef.current?.y ?? rect.top + rect.height / 2,
+          })
+          triggerRef.current.dispatchEvent(contextMenuEvent)
+          // Prevent default touch behavior after long press
+          e.preventDefault()
+        }
+      }, 500)
+    },
+    []
+  )
+
+  const handleTouchMove = React.useCallback(
+    (e: React.TouchEvent) => {
+      if (touchStartRef.current) {
+        const touch = e.touches[0]
+        const deltaX = Math.abs(touch.clientX - touchStartRef.current.x)
+        const deltaY = Math.abs(touch.clientY - touchStartRef.current.y)
+        // Cancel if moved more than 10px
+        if (deltaX > 10 || deltaY > 10) {
+          clearTimer()
+        }
+      }
+    },
+    [clearTimer]
+  )
+
+  const handleTouchEnd = React.useCallback(() => {
+    clearTimer()
+    touchStartRef.current = null
+  }, [clearTimer])
+
   return (
-    <ContextMenuPrimitive.Trigger data-slot="context-menu-trigger" {...props} />
+    <ContextMenuPrimitive.Trigger
+      ref={triggerRef}
+      data-slot="context-menu-trigger"
+      className={className}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+      {...props}
+    >
+      {children}
+    </ContextMenuPrimitive.Trigger>
   )
 }
 

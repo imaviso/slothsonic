@@ -250,7 +250,7 @@ export function PlaylistSongList({ playlistId, songs }: PlaylistSongListProps) {
 				});
 			}
 
-			return { previousPlaylist };
+			return { previousPlaylist, songIndex };
 		},
 		onError: (_err, _songIndex, context) => {
 			if (context?.previousPlaylist) {
@@ -261,10 +261,32 @@ export function PlaylistSongList({ playlistId, songs }: PlaylistSongListProps) {
 			}
 			toast.error("Failed to remove song from playlist");
 		},
-		onSuccess: () => {
+		onSuccess: (_data, _songIndex, context) => {
+			const removedSong = context?.previousPlaylist?.entry?.[context.songIndex];
 			queryClient.invalidateQueries({ queryKey: ["playlist", playlistId] });
 			queryClient.invalidateQueries({ queryKey: ["playlists"] });
-			toast.success("Removed from playlist");
+			toast.success("Removed from playlist", {
+				action: removedSong
+					? {
+							label: "Undo",
+							onClick: async () => {
+								try {
+									await updatePlaylist({
+										playlistId,
+										songIdToAdd: [removedSong.id],
+									});
+									queryClient.invalidateQueries({
+										queryKey: ["playlist", playlistId],
+									});
+									queryClient.invalidateQueries({ queryKey: ["playlists"] });
+									toast.success("Song restored to playlist");
+								} catch {
+									toast.error("Failed to restore song");
+								}
+							},
+						}
+					: undefined,
+			});
 		},
 		onSettled: () => {
 			setRemovingIndex(null);

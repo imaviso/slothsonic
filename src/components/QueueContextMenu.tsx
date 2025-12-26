@@ -11,6 +11,7 @@ import {
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import type { Song } from "@/lib/api";
+import { insertIntoQueue } from "@/lib/player";
 
 interface QueueContextMenuProps {
 	song: Song;
@@ -34,8 +35,18 @@ export function QueueContextMenu({
 			toast.error("Cannot remove the currently playing song");
 			return;
 		}
+		const removedIndex = index;
+		const removedSong = song;
 		onRemove();
-		toast.success("Removed from queue");
+		toast.success("Removed from queue", {
+			action: {
+				label: "Undo",
+				onClick: () => {
+					insertIntoQueue(removedSong, removedIndex);
+					toast.success("Song restored to queue");
+				},
+			},
+		});
 	};
 
 	const handleGoToAlbum = () => {

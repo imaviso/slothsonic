@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ListEnd, Play, Shuffle, Trash2 } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 import { toast } from "sonner";
 
 import {
@@ -11,7 +11,7 @@ import {
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import type { Playlist } from "@/lib/api";
-import { deletePlaylist, getPlaylist } from "@/lib/api";
+import { createPlaylist, deletePlaylist, getPlaylist } from "@/lib/api";
 import { addToQueue, playAlbum } from "@/lib/player";
 
 interface PlaylistContextMenuProps {
@@ -24,12 +24,48 @@ export function PlaylistContextMenu({
 	children,
 }: PlaylistContextMenuProps) {
 	const queryClient = useQueryClient();
+	// Store playlist data for undo
+	const deletedPlaylistData = useRef<{
+		name: string;
+		songIds: string[];
+	} | null>(null);
 
 	const deleteMutation = useMutation({
-		mutationFn: () => deletePlaylist(playlist.id),
+		mutationFn: async () => {
+			// Fetch playlist songs before deleting for undo capability
+			const data = await getPlaylist(playlist.id);
+			const songs = data.entry ?? [];
+			deletedPlaylistData.current = {
+				name: playlist.name,
+				songIds: songs.map((s) => s.id),
+			};
+			await deletePlaylist(playlist.id);
+		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["playlists"] });
-			toast.success("Playlist deleted");
+			const savedData = deletedPlaylistData.current;
+			toast.success("Playlist deleted", {
+				action: savedData
+					? {
+							label: "Undo",
+							onClick: async () => {
+								try {
+									await createPlaylist({
+										name: savedData.name,
+										songId:
+											savedData.songIds.length > 0
+												? savedData.songIds
+												: undefined,
+									});
+									queryClient.invalidateQueries({ queryKey: ["playlists"] });
+									toast.success("Playlist restored");
+								} catch {
+									toast.error("Failed to restore playlist");
+								}
+							},
+						}
+					: undefined,
+			});
 		},
 		onError: () => {
 			toast.error("Failed to delete playlist");
@@ -81,9 +117,7 @@ export function PlaylistContextMenu({
 	};
 
 	const handleDelete = () => {
-		if (confirm("Are you sure you want to delete this playlist?")) {
-			deleteMutation.mutate();
-		}
+		deleteMutation.mutate();
 	};
 
 	return (

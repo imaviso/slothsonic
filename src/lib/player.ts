@@ -401,8 +401,19 @@ export function playNextInQueue(song: Song) {
 	});
 }
 
-export function clearQueue() {
-	const { queue, currentTrack } = playerState;
+export function clearQueue(): {
+	previousQueue: Song[];
+	previousOriginalQueue: Song[];
+	previousQueueIndex: number;
+} | null {
+	const { queue, currentTrack, originalQueue, queueIndex } = playerState;
+
+	// Store previous state for undo
+	const previousState = {
+		previousQueue: [...queue],
+		previousOriginalQueue: [...originalQueue],
+		previousQueueIndex: queueIndex,
+	};
 
 	// If there's a current track, keep only that song in the queue
 	if (currentTrack && queue.length > 1) {
@@ -411,22 +422,44 @@ export function clearQueue() {
 			originalQueue: [currentTrack],
 			queueIndex: 0,
 		});
-	} else {
-		// Otherwise completely clear the queue
-		const audioEl = getAudio();
-		audioEl.pause();
-		audioEl.src = "";
-		updateState({ ...initialState });
+		return previousState;
 	}
+	// Otherwise completely clear the queue
+	const audioEl = getAudio();
+	audioEl.pause();
+	audioEl.src = "";
+	updateState({ ...initialState });
+	return previousState;
 }
 
-export function removeFromQueue(index: number) {
+// Restore a previously saved queue state (for undo)
+export function restoreQueueState(state: {
+	previousQueue: Song[];
+	previousOriginalQueue: Song[];
+	previousQueueIndex: number;
+}) {
+	const { previousQueue, previousOriginalQueue, previousQueueIndex } = state;
+	if (previousQueue.length === 0) return;
+
+	updateState({
+		queue: previousQueue,
+		originalQueue: previousOriginalQueue,
+		queueIndex: previousQueueIndex,
+		currentTrack: previousQueue[previousQueueIndex],
+	});
+}
+
+export function removeFromQueue(
+	index: number,
+): { song: Song; index: number } | null {
 	const { queue, originalQueue, queueIndex, currentTrack } = playerState;
 
 	// Don't allow removing the currently playing song
 	if (index === queueIndex && currentTrack) {
-		return;
+		return null;
 	}
+
+	const removedSong = queue[index];
 
 	// Remove from both queues
 	const newQueue = queue.filter((_, i) => i !== index);
@@ -436,6 +469,32 @@ export function removeFromQueue(index: number) {
 	let newQueueIndex = queueIndex;
 	if (index < queueIndex) {
 		newQueueIndex = queueIndex - 1;
+	}
+
+	updateState({
+		queue: newQueue,
+		originalQueue: newOriginalQueue,
+		queueIndex: newQueueIndex,
+	});
+
+	return { song: removedSong, index };
+}
+
+// Re-insert a song at a specific index in the queue (for undo)
+export function insertIntoQueue(song: Song, index: number) {
+	const { queue, originalQueue, queueIndex } = playerState;
+
+	const newQueue = [...queue.slice(0, index), song, ...queue.slice(index)];
+	const newOriginalQueue = [
+		...originalQueue.slice(0, index),
+		song,
+		...originalQueue.slice(index),
+	];
+
+	// Adjust queueIndex if needed
+	let newQueueIndex = queueIndex;
+	if (index <= queueIndex) {
+		newQueueIndex = queueIndex + 1;
 	}
 
 	updateState({
@@ -625,7 +684,9 @@ export function usePlayer() {
 		addToQueue,
 		playNextInQueue,
 		removeFromQueue,
+		insertIntoQueue,
 		clearQueue,
+		restoreQueueState,
 		toggleShuffle,
 		toggleRepeat,
 		setRepeat,

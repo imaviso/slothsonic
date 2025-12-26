@@ -1,3 +1,4 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
 	Disc3,
@@ -18,13 +19,15 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+
 import { AddToPlaylistButton } from "@/components/AddToPlaylistButton";
 import { LyricsPanel } from "@/components/LyricsPanel";
 import { QueueContextMenu } from "@/components/QueueContextMenu";
 import { StarButton } from "@/components/StarButton";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { getTrackCoverUrl, usePlayer } from "@/lib/player";
+import { star, unstar } from "@/lib/api";
+import { getTrackCoverUrl, restoreQueueState, usePlayer } from "@/lib/player";
 import { cn } from "@/lib/utils";
 
 function formatTime(seconds: number): string {
@@ -64,6 +67,38 @@ export function Player() {
 	const [prevVolume, setPrevVolume] = useState(1);
 	const [showQueue, setShowQueue] = useState(false);
 	const [showLyrics, setShowLyrics] = useState(false);
+
+	const queryClient = useQueryClient();
+
+	// Mutation for starring/unstarring current track via keyboard
+	const starMutation = useMutation({
+		mutationFn: async ({
+			songId,
+			shouldStar,
+		}: {
+			songId: string;
+			shouldStar: boolean;
+		}) => {
+			if (shouldStar) {
+				await star({ id: songId });
+			} else {
+				await unstar({ id: songId });
+			}
+		},
+		onSuccess: (_, { shouldStar }) => {
+			toast.success(
+				shouldStar ? "Added to favorites" : "Removed from favorites",
+			);
+			queryClient.invalidateQueries({ queryKey: ["starred"] });
+		},
+		onError: (_, { shouldStar }) => {
+			toast.error(
+				shouldStar
+					? "Failed to add to favorites"
+					: "Failed to remove from favorites",
+			);
+		},
+	});
 
 	useEffect(() => {
 		if (currentTrack?.coverArt) {
@@ -112,6 +147,34 @@ export function Player() {
 					e.preventDefault();
 					playPrevious();
 					break;
+				case "KeyM":
+					e.preventDefault();
+					// Toggle mute
+					if (volume > 0) {
+						setPrevVolume(volume);
+						setVolume(0);
+					} else {
+						setVolume(prevVolume);
+					}
+					break;
+				case "KeyL":
+					e.preventDefault();
+					// Toggle favorite for current track
+					if (currentTrack) {
+						starMutation.mutate({
+							songId: currentTrack.id,
+							shouldStar: !currentTrack.starred,
+						});
+					}
+					break;
+				case "KeyR":
+					e.preventDefault();
+					toggleRepeat();
+					break;
+				case "KeyS":
+					e.preventDefault();
+					toggleShuffle();
+					break;
 				default:
 					break;
 			}
@@ -128,6 +191,11 @@ export function Player() {
 		currentTime,
 		duration,
 		volume,
+		prevVolume,
+		currentTrack,
+		starMutation,
+		toggleRepeat,
+		toggleShuffle,
 	]);
 
 	// Don't render if no track
@@ -424,8 +492,21 @@ export function Player() {
 									size="icon"
 									className="w-6 h-6"
 									onClick={() => {
-										clearQueue();
-										toast.success("Queue cleared");
+										const previousState = clearQueue();
+										if (
+											previousState &&
+											previousState.previousQueue.length > 1
+										) {
+											toast.success("Queue cleared", {
+												action: {
+													label: "Undo",
+													onClick: () => {
+														restoreQueueState(previousState);
+														toast.success("Queue restored");
+													},
+												},
+											});
+										}
 									}}
 									title="Clear queue"
 								>
