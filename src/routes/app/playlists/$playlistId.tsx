@@ -16,6 +16,14 @@ import { toast } from "sonner";
 
 import { PlaylistSongList } from "@/components/PlaylistSongList";
 import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
 	deletePlaylist,
@@ -46,6 +54,7 @@ function PlaylistDetailPage() {
 	const [coverUrl, setCoverUrl] = useState<string | null>(null);
 	const [isEditing, setIsEditing] = useState(false);
 	const [editName, setEditName] = useState("");
+	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 	const { currentTrack, isPlaying, togglePlayPause, shuffle, toggleShuffle } =
 		usePlayer();
 
@@ -75,7 +84,6 @@ function PlaylistDetailPage() {
 		mutationFn: () => deletePlaylist(playlistId),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["playlists"] });
-			navigate({ to: "/app/playlists" });
 			toast.success("Playlist deleted");
 		},
 		onError: () => {
@@ -165,9 +173,14 @@ function PlaylistDetailPage() {
 	};
 
 	const handleDelete = () => {
-		if (confirm("Are you sure you want to delete this playlist?")) {
-			deleteMutation.mutate();
-		}
+		setDeleteDialogOpen(true);
+	};
+
+	const confirmDelete = () => {
+		setDeleteDialogOpen(false);
+		// Navigate immediately for optimistic UX
+		navigate({ to: "/app/playlists" });
+		deleteMutation.mutate();
 	};
 
 	const handleSaveEdit = (e: React.FormEvent) => {
@@ -181,6 +194,41 @@ function PlaylistDetailPage() {
 
 	return (
 		<div className="p-6 space-y-6">
+			{/* Delete confirmation dialog */}
+			<Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Delete Playlist</DialogTitle>
+						<DialogDescription>
+							Are you sure you want to delete "{playlist.name}"? This action
+							cannot be undone.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<Button
+							variant="outline"
+							onClick={() => setDeleteDialogOpen(false)}
+						>
+							Cancel
+						</Button>
+						<Button
+							variant="destructive"
+							onClick={confirmDelete}
+							disabled={deleteMutation.isPending}
+						>
+							{deleteMutation.isPending ? (
+								<>
+									<Loader2 className="w-4 h-4 animate-spin mr-2" />
+									Deleting...
+								</>
+							) : (
+								"Delete"
+							)}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
 			{/* Back button */}
 			<Link
 				to="/app/playlists"
