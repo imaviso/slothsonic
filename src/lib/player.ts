@@ -562,6 +562,28 @@ export function setRepeat(mode: RepeatMode) {
 	updateState({ repeat: mode });
 }
 
+// Update the starred status of the current track (for optimistic UI updates)
+export function updateCurrentTrackStarred(starred: boolean) {
+	const { currentTrack, queue, queueIndex } = playerState;
+	if (!currentTrack) return;
+
+	const updatedTrack = {
+		...currentTrack,
+		starred: starred ? new Date().toISOString() : undefined,
+	};
+
+	// Update the track in the queue as well
+	const updatedQueue = [...queue];
+	if (queueIndex >= 0 && queueIndex < updatedQueue.length) {
+		updatedQueue[queueIndex] = updatedTrack;
+	}
+
+	updateState({
+		currentTrack: updatedTrack,
+		queue: updatedQueue,
+	});
+}
+
 // Save queue immediately (for page unload)
 export function saveQueueNow(): Promise<void> {
 	const { queue, currentTrack, currentTime } = playerState;

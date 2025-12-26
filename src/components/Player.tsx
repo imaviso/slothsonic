@@ -27,7 +27,12 @@ import { StarButton } from "@/components/StarButton";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { star, unstar } from "@/lib/api";
-import { getTrackCoverUrl, restoreQueueState, usePlayer } from "@/lib/player";
+import {
+	getTrackCoverUrl,
+	restoreQueueState,
+	updateCurrentTrackStarred,
+	usePlayer,
+} from "@/lib/player";
 import { cn } from "@/lib/utils";
 
 function formatTime(seconds: number): string {
@@ -85,6 +90,10 @@ export function Player() {
 				await unstar({ id: songId });
 			}
 		},
+		onMutate: ({ shouldStar }) => {
+			// Optimistically update the player state
+			updateCurrentTrackStarred(shouldStar);
+		},
 		onSuccess: (_, { shouldStar }) => {
 			toast.success(
 				shouldStar ? "Added to favorites" : "Removed from favorites",
@@ -92,6 +101,8 @@ export function Player() {
 			queryClient.invalidateQueries({ queryKey: ["starred"] });
 		},
 		onError: (_, { shouldStar }) => {
+			// Revert optimistic update on error
+			updateCurrentTrackStarred(!shouldStar);
 			toast.error(
 				shouldStar
 					? "Failed to add to favorites"
