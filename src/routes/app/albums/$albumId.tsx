@@ -4,6 +4,7 @@ import { ArrowLeft, Clock, Disc3, Pause, Play, Tag } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AddToPlaylistButton } from "@/components/AddToPlaylistButton";
 import { MoreByArtist } from "@/components/MoreByArtist";
+import { SongContextMenu } from "@/components/SongContextMenu";
 import { StarButton } from "@/components/StarButton";
 import { Button } from "@/components/ui/button";
 import { getAlbum, getCoverArtUrl } from "@/lib/api";
@@ -235,94 +236,104 @@ function AlbumDetailPage() {
 						const isThisTrackPlaying = isCurrentTrack && isPlaying;
 
 						return (
-							<div
+							<SongContextMenu
 								key={song.id}
-								className={cn(
-									"w-full grid grid-cols-[2rem_1fr_2rem_2rem_3rem] gap-4 px-4 py-3 hover:bg-muted/50 transition-colors group",
-									isCurrentTrack && "bg-muted/30",
-								)}
+								song={song}
+								songs={songs}
+								index={index}
 							>
-								{/* Track number / Play indicator */}
-								<button
-									type="button"
-									onClick={() => handlePlayTrack(index)}
-									className="flex items-center justify-center"
-								>
-									{isThisTrackPlaying ? (
-										<span className="w-3 h-3 flex gap-0.5 items-end">
-											<span className="w-0.5 h-2 bg-primary animate-pulse" />
-											<span
-												className="w-0.5 h-3 bg-primary animate-pulse"
-												style={{ animationDelay: "0.2s" }}
-											/>
-											<span
-												className="w-0.5 h-1.5 bg-primary animate-pulse"
-												style={{ animationDelay: "0.4s" }}
-											/>
-										</span>
-									) : (
-										<>
-											<span
-												className={cn(
-													"text-sm group-hover:hidden",
-													isCurrentTrack
-														? "text-primary"
-														: "text-muted-foreground",
-												)}
-											>
-												{song.track || index + 1}
-											</span>
-											<Play
-												className={cn(
-													"w-4 h-4 hidden group-hover:block",
-													isCurrentTrack ? "text-primary" : "text-foreground",
-												)}
-											/>
-										</>
+								<div
+									className={cn(
+										"w-full grid grid-cols-[2rem_1fr_2rem_2rem_3rem] gap-4 px-4 py-3 hover:bg-muted/50 transition-colors group",
+										isCurrentTrack && "bg-muted/30",
 									)}
-								</button>
-
-								{/* Song info */}
-								<button
-									type="button"
-									onClick={() => handlePlayTrack(index)}
-									className="min-w-0 text-left"
 								>
-									<p
-										className={cn(
-											"font-medium truncate",
-											isCurrentTrack ? "text-primary" : "text-foreground",
-										)}
+									{/* Track number / Play indicator */}
+									<button
+										type="button"
+										onClick={() => handlePlayTrack(index)}
+										className="flex items-center justify-center"
 									>
-										{song.title}
-									</p>
-									{song.artist && song.artist !== album.artist && (
-										<p className="text-sm text-muted-foreground truncate">
-											{song.artist}
+										{isThisTrackPlaying ? (
+											<span className="w-3 h-3 flex gap-0.5 items-end">
+												<span className="w-0.5 h-2 bg-primary animate-pulse" />
+												<span
+													className="w-0.5 h-3 bg-primary animate-pulse"
+													style={{ animationDelay: "0.2s" }}
+												/>
+												<span
+													className="w-0.5 h-1.5 bg-primary animate-pulse"
+													style={{ animationDelay: "0.4s" }}
+												/>
+											</span>
+										) : (
+											<>
+												<span
+													className={cn(
+														"text-sm group-hover:hidden",
+														isCurrentTrack
+															? "text-primary"
+															: "text-muted-foreground",
+													)}
+												>
+													{song.track || index + 1}
+												</span>
+												<Play
+													className={cn(
+														"w-4 h-4 hidden group-hover:block",
+														isCurrentTrack ? "text-primary" : "text-foreground",
+													)}
+												/>
+											</>
+										)}
+									</button>
+
+									{/* Song info */}
+									<button
+										type="button"
+										onClick={() => handlePlayTrack(index)}
+										className="min-w-0 text-left"
+									>
+										<p
+											className={cn(
+												"font-medium truncate",
+												isCurrentTrack ? "text-primary" : "text-foreground",
+											)}
+										>
+											{song.title}
 										</p>
-									)}
-								</button>
+										{song.artist && song.artist !== album.artist && (
+											<p className="text-sm text-muted-foreground truncate">
+												{song.artist}
+											</p>
+										)}
+									</button>
 
-								{/* Star button */}
-								<div className="flex items-center">
-									<StarButton
-										id={song.id}
-										type="song"
-										isStarred={!!song.starred}
-										size="sm"
-									/>
+									{/* Star button */}
+									<div className="flex items-center">
+										<StarButton
+											id={song.id}
+											type="song"
+											isStarred={!!song.starred}
+											size="sm"
+										/>
+									</div>
+
+									{/* Add to playlist */}
+									<div className="flex items-center">
+										<AddToPlaylistButton
+											songId={song.id}
+											song={song}
+											size="sm"
+										/>
+									</div>
+
+									{/* Duration */}
+									<span className="text-sm text-muted-foreground flex items-center justify-end">
+										{song.duration ? formatDuration(song.duration) : "—"}
+									</span>
 								</div>
-
-								{/* Add to playlist */}
-								<div className="flex items-center">
-									<AddToPlaylistButton songId={song.id} song={song} size="sm" />
-								</div>
-
-								{/* Duration */}
-								<span className="text-sm text-muted-foreground flex items-center justify-end">
-									{song.duration ? formatDuration(song.duration) : "—"}
-								</span>
-							</div>
+							</SongContextMenu>
 						);
 					})}
 				</div>

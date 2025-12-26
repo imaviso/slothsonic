@@ -3,6 +3,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Music, Tags } from "lucide-react";
 import { useState } from "react";
 
+import { GenreContextMenu } from "@/components/GenreContextMenu";
 import { Input } from "@/components/ui/input";
 import { getGenres } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -96,32 +97,34 @@ function GenreCard({ genre }: GenreCardProps) {
 		360;
 
 	return (
-		<Link
-			to="/app/genres/$genreName"
-			params={{ genreName: encodeURIComponent(genre.value) }}
-			className={cn(
-				"group block rounded-lg bg-card p-4 transition-colors hover:bg-accent",
-			)}
-		>
-			{/* Genre icon with colored background */}
-			<div
-				className="aspect-square rounded-md mb-3 flex items-center justify-center transition-transform group-hover:scale-105"
-				style={{
-					background: `linear-gradient(135deg, hsl(${hue}, 70%, 50%), hsl(${(hue + 40) % 360}, 70%, 40%))`,
-				}}
+		<GenreContextMenu genreName={genre.value}>
+			<Link
+				to="/app/genres/$genreName"
+				params={{ genreName: encodeURIComponent(genre.value) }}
+				className={cn(
+					"group block rounded-lg bg-card p-4 transition-colors hover:bg-accent",
+				)}
 			>
-				<Music className="w-10 h-10 text-white drop-shadow-md" />
-			</div>
+				{/* Genre icon with colored background */}
+				<div
+					className="aspect-square rounded-md mb-3 flex items-center justify-center transition-transform group-hover:scale-105"
+					style={{
+						background: `linear-gradient(135deg, hsl(${hue}, 70%, 50%), hsl(${(hue + 40) % 360}, 70%, 40%))`,
+					}}
+				>
+					<Music className="w-10 h-10 text-white drop-shadow-md" />
+				</div>
 
-			{/* Genre info */}
-			<div className="space-y-1">
-				<h3 className="font-medium text-sm text-foreground truncate group-hover:text-primary">
-					{genre.value}
-				</h3>
-				<p className="text-xs text-muted-foreground">
-					{genre.songCount} song{genre.songCount !== 1 ? "s" : ""}
-				</p>
-			</div>
-		</Link>
+				{/* Genre info */}
+				<div className="space-y-1">
+					<h3 className="font-medium text-sm text-foreground truncate group-hover:text-primary">
+						{genre.value}
+					</h3>
+					<p className="text-xs text-muted-foreground">
+						{genre.songCount} song{genre.songCount !== 1 ? "s" : ""}
+					</p>
+				</div>
+			</Link>
+		</GenreContextMenu>
 	);
 }

@@ -5,6 +5,7 @@ import { ListMusic, Loader2, Music, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import * as v from "valibot";
 
+import { PlaylistContextMenu } from "@/components/PlaylistContextMenu";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -64,54 +65,56 @@ function PlaylistCard({ playlist, onDelete, isDeleting }: PlaylistCardProps) {
 	}, [playlist.coverArt]);
 
 	return (
-		<div className="group relative rounded-lg bg-card p-3 hover:bg-muted/50 transition-colors">
-			<Link
-				to="/app/playlists/$playlistId"
-				params={{ playlistId: playlist.id }}
-				className="block"
-			>
-				<div className="aspect-square rounded-md overflow-hidden bg-muted mb-3">
-					{coverUrl ? (
-						<img
-							src={coverUrl}
-							alt={playlist.name}
-							className="w-full h-full object-cover"
-						/>
-					) : (
-						<div className="w-full h-full flex items-center justify-center">
-							<ListMusic className="w-12 h-12 text-muted-foreground" />
-						</div>
+		<PlaylistContextMenu playlist={playlist}>
+			<div className="group relative rounded-lg bg-card p-3 hover:bg-muted/50 transition-colors">
+				<Link
+					to="/app/playlists/$playlistId"
+					params={{ playlistId: playlist.id }}
+					className="block"
+				>
+					<div className="aspect-square rounded-md overflow-hidden bg-muted mb-3">
+						{coverUrl ? (
+							<img
+								src={coverUrl}
+								alt={playlist.name}
+								className="w-full h-full object-cover"
+							/>
+						) : (
+							<div className="w-full h-full flex items-center justify-center">
+								<ListMusic className="w-12 h-12 text-muted-foreground" />
+							</div>
+						)}
+					</div>
+					<h3 className="font-medium text-sm truncate text-foreground">
+						{playlist.name}
+					</h3>
+					<p className="text-xs text-muted-foreground truncate">
+						{playlist.songCount} songs · {formatDuration(playlist.duration)}
+					</p>
+				</Link>
+				<Button
+					variant="ghost"
+					size="icon"
+					className={cn(
+						"absolute top-2 right-2 w-8 h-8 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-destructive hover:text-destructive-foreground",
+						isDeleting && "opacity-100",
 					)}
-				</div>
-				<h3 className="font-medium text-sm truncate text-foreground">
-					{playlist.name}
-				</h3>
-				<p className="text-xs text-muted-foreground truncate">
-					{playlist.songCount} songs · {formatDuration(playlist.duration)}
-				</p>
-			</Link>
-			<Button
-				variant="ghost"
-				size="icon"
-				className={cn(
-					"absolute top-2 right-2 w-8 h-8 opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 hover:bg-destructive hover:text-destructive-foreground",
-					isDeleting && "opacity-100",
-				)}
-				onClick={(e) => {
-					e.preventDefault();
-					e.stopPropagation();
-					onDelete(playlist.id);
-				}}
-				disabled={isDeleting}
-				title="Delete playlist"
-			>
-				{isDeleting ? (
-					<Loader2 className="w-4 h-4 animate-spin" />
-				) : (
-					<Trash2 className="w-4 h-4" />
-				)}
-			</Button>
-		</div>
+					onClick={(e) => {
+						e.preventDefault();
+						e.stopPropagation();
+						onDelete(playlist.id);
+					}}
+					disabled={isDeleting}
+					title="Delete playlist"
+				>
+					{isDeleting ? (
+						<Loader2 className="w-4 h-4 animate-spin" />
+					) : (
+						<Trash2 className="w-4 h-4" />
+					)}
+				</Button>
+			</div>
+		</PlaylistContextMenu>
 	);
 }
 
