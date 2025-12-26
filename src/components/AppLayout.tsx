@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect } from "react";
 
+import { GlobalContextMenu } from "@/components/GlobalContextMenu";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { Player } from "@/components/Player";
 import { Button } from "@/components/ui/button";
@@ -252,11 +253,13 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
 export function AppLayout({ children }: AppLayoutProps) {
 	return (
-		<SidebarProvider>
-			<AppSidebar />
-			<AppContent>{children}</AppContent>
-			<GlobalSearch />
-			<Toaster position="top-center" />
-		</SidebarProvider>
+		<GlobalContextMenu>
+			<SidebarProvider>
+				<AppSidebar />
+				<AppContent>{children}</AppContent>
+				<GlobalSearch />
+				<Toaster position="top-center" />
+			</SidebarProvider>
+		</GlobalContextMenu>
 	);
 }

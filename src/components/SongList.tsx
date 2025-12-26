@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { Clock, Music, Play } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -127,7 +128,18 @@ function SongRow({
 						</p>
 						{showArtist && song.artist && (
 							<p className="text-xs text-muted-foreground truncate">
-								{song.artist}
+								{song.artistId ? (
+									<Link
+										to="/app/artists/$artistId"
+										params={{ artistId: song.artistId }}
+										onClick={(e) => e.stopPropagation()}
+										className="hover:underline hover:text-foreground"
+									>
+										{song.artist}
+									</Link>
+								) : (
+									song.artist
+								)}
 							</p>
 						)}
 					</div>
@@ -137,7 +149,17 @@ function SongRow({
 				{showAlbum && (
 					<div className="hidden sm:flex items-center min-w-0">
 						<p className="text-sm text-muted-foreground truncate">
-							{song.album}
+							{song.albumId ? (
+								<Link
+									to="/app/albums/$albumId"
+									params={{ albumId: song.albumId }}
+									className="hover:underline hover:text-foreground"
+								>
+									{song.album}
+								</Link>
+							) : (
+								song.album
+							)}
 						</p>
 					</div>
 				)}
