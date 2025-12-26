@@ -19,6 +19,7 @@ import {
 	ContextMenuShortcut,
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { togglePlayPause, usePlayer } from "@/lib/player";
 
 interface GlobalContextMenuProps {
@@ -28,10 +29,14 @@ interface GlobalContextMenuProps {
 export function GlobalContextMenu({ children }: GlobalContextMenuProps) {
 	const navigate = useNavigate();
 	const { isPlaying } = usePlayer();
+	const isMobile = useIsMobile();
 
 	// Prevent native context menu on the entire document
 	// except for inputs, textareas, and elements with existing context menus
 	useEffect(() => {
+		// Don't prevent native context menu on mobile
+		if (isMobile) return;
+
 		const handleContextMenu = (e: MouseEvent) => {
 			const target = e.target as HTMLElement;
 
@@ -59,7 +64,7 @@ export function GlobalContextMenu({ children }: GlobalContextMenuProps) {
 
 		document.addEventListener("contextmenu", handleContextMenu);
 		return () => document.removeEventListener("contextmenu", handleContextMenu);
-	}, []);
+	}, [isMobile]);
 
 	const handleOpenSearch = useCallback(() => {
 		// Trigger the global search (Cmd+K)
@@ -81,6 +86,11 @@ export function GlobalContextMenu({ children }: GlobalContextMenuProps) {
 		},
 		[navigate],
 	);
+
+	// On mobile, just render children without context menu wrapper
+	if (isMobile) {
+		return <div className="flex min-h-svh w-full flex-col">{children}</div>;
+	}
 
 	return (
 		<ContextMenu>
