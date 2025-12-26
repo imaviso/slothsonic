@@ -1,6 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Disc3, Heart, History, Music, TrendingUp, Users } from "lucide-react";
+import {
+	Disc3,
+	Heart,
+	History,
+	Keyboard,
+	Music,
+	TrendingUp,
+	Users,
+} from "lucide-react";
 
 import { AlbumGrid } from "@/components/AlbumCard";
 import { SongList } from "@/components/SongList";
@@ -78,6 +86,22 @@ function AppHome() {
 					value={songs?.length ? "Many" : "—"}
 				/>
 			</div>
+
+			{/* Keyboard Shortcuts */}
+			<section className="bg-card rounded-lg border p-4">
+				<div className="flex items-center gap-2 mb-3">
+					<Keyboard className="w-4 h-4 text-primary" />
+					<h3 className="text-sm font-medium text-foreground">
+						Keyboard Shortcuts
+					</h3>
+				</div>
+				<div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+					<ShortcutHint keys={["⌘", "K"]} description="Search" />
+					<ShortcutHint keys={["Space"]} description="Play / Pause" />
+					<ShortcutHint keys={["←", "→"]} description="Seek ±10s" />
+					<ShortcutHint keys={["↑", "↓"]} description="Volume" />
+				</div>
+			</section>
 
 			{/* Favorites/Starred Songs */}
 			{(loadingStarred || (starred?.songs && starred.songs.length > 0)) && (
@@ -178,6 +202,30 @@ function StatCard({
 					<p className="text-sm text-muted-foreground">{label}</p>
 				</div>
 			</div>
+		</div>
+	);
+}
+
+function ShortcutHint({
+	keys,
+	description,
+}: {
+	keys: string[];
+	description: string;
+}) {
+	return (
+		<div className="flex items-center gap-2">
+			<div className="flex items-center gap-1">
+				{keys.map((key) => (
+					<kbd
+						key={key}
+						className="px-1.5 py-0.5 text-xs bg-muted rounded border border-border font-mono"
+					>
+						{key}
+					</kbd>
+				))}
+			</div>
+			<span className="text-muted-foreground">{description}</span>
 		</div>
 	);
 }
