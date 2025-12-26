@@ -120,18 +120,27 @@ function PlaylistDetailPage() {
 		},
 	});
 
-	const handleSearch = async () => {
-		if (!searchQuery.trim()) return;
-		setIsSearching(true);
-		try {
-			const results = await search(searchQuery);
-			setSearchResults(results.songs);
-		} catch {
-			toast.error("Search failed");
-		} finally {
-			setIsSearching(false);
+	// Debounced auto-search
+	useEffect(() => {
+		if (!searchQuery.trim()) {
+			setSearchResults([]);
+			return;
 		}
-	};
+
+		setIsSearching(true);
+		const timeoutId = setTimeout(async () => {
+			try {
+				const results = await search(searchQuery);
+				setSearchResults(results.songs);
+			} catch {
+				toast.error("Search failed");
+			} finally {
+				setIsSearching(false);
+			}
+		}, 300);
+
+		return () => clearTimeout(timeoutId);
+	}, [searchQuery]);
 
 	const toggleSongSelection = (songId: string) => {
 		setSelectedSongIds((prev) => {
@@ -460,35 +469,27 @@ function PlaylistDetailPage() {
 							Search for songs to add to "{playlist.name}"
 						</DialogDescription>
 					</DialogHeader>
-					<div className="flex gap-2">
-						<div className="relative flex-1">
-							<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-							<Input
-								placeholder="Search for songs..."
-								value={searchQuery}
-								onChange={(e) => setSearchQuery(e.target.value)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter") {
-										handleSearch();
-									}
-								}}
-								className="pl-9"
-							/>
-						</div>
-						<Button onClick={handleSearch} disabled={isSearching}>
-							{isSearching ? (
-								<Loader2 className="w-4 h-4 animate-spin" />
-							) : (
-								"Search"
-							)}
-						</Button>
+					<div className="relative">
+						<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+						<Input
+							placeholder="Search for songs..."
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							className="pl-9"
+							autoFocus
+						/>
+						{isSearching && (
+							<Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
+						)}
 					</div>
 					<div className="flex-1 overflow-y-auto min-h-0 space-y-1">
 						{searchResults.length === 0 ? (
 							<div className="text-center py-8 text-muted-foreground">
-								{searchQuery
+								{searchQuery && !isSearching
 									? "No songs found"
-									: "Search for songs to add to your playlist"}
+									: !searchQuery
+										? "Start typing to search for songs"
+										: "Searching..."}
 							</div>
 						) : (
 							searchResults.map((song) => {
