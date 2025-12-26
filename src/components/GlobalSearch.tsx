@@ -1,6 +1,7 @@
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Disc3, Loader2, type LucideIcon, Music, User } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Disc3, Music, Play, User } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -10,236 +11,214 @@ import {
 	CommandInput,
 	CommandItem,
 	CommandList,
+	CommandSeparator,
 } from "@/components/ui/command";
-import type { Album as AlbumType, Artist, Song } from "@/lib/api";
+import type { Album, Artist, Song } from "@/lib/api";
 import { search } from "@/lib/api";
 import { playSong } from "@/lib/player";
-
-interface SearchResultItem {
-	id: string;
-	title: string;
-	subtitle?: string;
-	type: "song" | "album" | "artist";
-	icon: LucideIcon;
-	data: Song | AlbumType | Artist;
-}
 
 export function GlobalSearch() {
 	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
-	const [results, setResults] = useState<SearchResultItem[]>([]);
-	const [loading, setLoading] = useState(false);
 	const navigate = useNavigate();
 
-	// Handle Cmd/Ctrl+K hotkey
+	// Debounced search query
+	const [debouncedQuery, setDebouncedQuery] = useState("");
+
 	useEffect(() => {
-		const down = (e: KeyboardEvent) => {
-			if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-				e.preventDefault();
-				setOpen((open) => !open);
-			}
-		};
-
-		document.addEventListener("keydown", down);
-		return () => document.removeEventListener("keydown", down);
-	}, []);
-
-	// Auto close when navigation occurs
-	useEffect(() => {
-		setOpen(false);
-	}, []);
-
-	// Search with debounce
-	useEffect(() => {
-		if (!query.trim()) {
-			setResults([]);
-			return;
-		}
-
-		setLoading(true);
-		const timer = setTimeout(async () => {
-			try {
-				const searchResults = await search(query);
-
-				const items: SearchResultItem[] = [];
-
-				// Add songs
-				searchResults.songs.forEach((song) => {
-					items.push({
-						id: song.id,
-						title: song.title,
-						subtitle: song.artist,
-						type: "song",
-						icon: Music,
-						data: song,
-					});
-				});
-
-				// Add albums
-				searchResults.albums.forEach((album) => {
-					items.push({
-						id: album.id,
-						title: album.name,
-						subtitle: album.artist,
-						type: "album",
-						icon: Disc3,
-						data: album,
-					});
-				});
-
-				// Add artists
-				searchResults.artists.forEach((artist) => {
-					items.push({
-						id: artist.id,
-						title: artist.name,
-						subtitle: `${artist.albumCount ?? 0} albums`,
-						type: "artist",
-						icon: User,
-						data: artist,
-					});
-				});
-
-				setResults(items);
-			} catch (error) {
-				console.error("Search error:", error);
-				toast.error("Search failed");
-			} finally {
-				setLoading(false);
-			}
+		const timer = setTimeout(() => {
+			setDebouncedQuery(query);
 		}, 300);
-
 		return () => clearTimeout(timer);
 	}, [query]);
 
-	const handleSelect = (item: SearchResultItem) => {
-		setOpen(false);
+	// Search API call
+	const { data: searchResults, isLoading } = useQuery({
+		queryKey: ["search", debouncedQuery],
+		queryFn: () => search(debouncedQuery),
+		enabled: debouncedQuery.length >= 2,
+		staleTime: 30000,
+	});
 
-		switch (item.type) {
-			case "song": {
-				const song = item.data as Song;
-				playSong(song);
-				toast.success(`Playing "${song.title}"`);
-				break;
+	// Keyboard shortcut to open search
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			// Cmd+K (Mac) or Ctrl+K (Windows/Linux)
+			if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+				e.preventDefault();
+				setOpen((prev) => !prev);
 			}
-			case "album": {
-				const album = item.data as AlbumType;
-				navigate({
-					to: "/app/albums/$albumId",
-					params: { albumId: album.id },
-				});
-				break;
+			// Also support "/" key when not in input
+			if (e.key === "/" && !open) {
+				const target = e.target as HTMLElement;
+				const isInputFocused =
+					target.tagName === "INPUT" ||
+					target.tagName === "TEXTAREA" ||
+					target.isContentEditable;
+				if (!isInputFocused) {
+					e.preventDefault();
+					setOpen(true);
+				}
 			}
-			case "artist": {
-				const artist = item.data as Artist;
-				navigate({
-					to: "/app/artists/$artistId",
-					params: { artistId: artist.id },
-				});
-				break;
-			}
+		};
+
+		document.addEventListener("keydown", handleKeyDown);
+		return () => document.removeEventListener("keydown", handleKeyDown);
+	}, [open]);
+
+	// Reset query when dialog closes
+	useEffect(() => {
+		if (!open) {
+			setQuery("");
+			setDebouncedQuery("");
 		}
-	};
+	}, [open]);
 
-	// Group results by type
-	const groupedResults = {
-		songs: results.filter((r) => r.type === "song"),
-		albums: results.filter((r) => r.type === "album"),
-		artists: results.filter((r) => r.type === "artist"),
-	};
+	const handleSelectArtist = useCallback(
+		(artist: Artist) => {
+			setOpen(false);
+			navigate({
+				to: "/app/artists/$artistId",
+				params: { artistId: artist.id },
+			});
+		},
+		[navigate],
+	);
+
+	const handleSelectAlbum = useCallback(
+		(album: Album) => {
+			setOpen(false);
+			navigate({
+				to: "/app/albums/$albumId",
+				params: { albumId: album.id },
+			});
+		},
+		[navigate],
+	);
+
+	const handleSelectSong = useCallback((song: Song) => {
+		setOpen(false);
+		playSong(song);
+		toast.success(`Playing "${song.title}"`);
+	}, []);
+
+	const hasResults =
+		searchResults &&
+		(searchResults.artists.length > 0 ||
+			searchResults.albums.length > 0 ||
+			searchResults.songs.length > 0);
 
 	return (
 		<CommandDialog
 			open={open}
 			onOpenChange={setOpen}
 			title="Search"
-			description="Search for songs, albums, and artists"
+			description="Search for artists, albums, and songs"
 		>
 			<CommandInput
-				placeholder="Search songs, albums, artists... (Cmd+K)"
+				placeholder="Search artists, albums, songs..."
 				value={query}
 				onValueChange={setQuery}
 			/>
 			<CommandList>
-				{loading && (
-					<div className="flex items-center justify-center py-6">
-						<Loader2 className="h-4 w-4 animate-spin" />
-					</div>
-				)}
-
-				{!loading && !query && (
+				{debouncedQuery.length < 2 && (
 					<CommandEmpty>
-						<div className="text-center text-sm text-muted-foreground">
-							<p>Type to search for songs, albums, and artists</p>
+						<div className="text-muted-foreground">
+							<p>Type at least 2 characters to search</p>
 							<p className="text-xs mt-2">
-								Press <kbd className="bg-muted px-1 rounded">Cmd</kbd> +{" "}
-								<kbd className="bg-muted px-1 rounded">K</kbd> to focus
+								Press{" "}
+								<kbd className="px-1.5 py-0.5 text-xs bg-muted rounded">⌘K</kbd>{" "}
+								or{" "}
+								<kbd className="px-1.5 py-0.5 text-xs bg-muted rounded">/</kbd>{" "}
+								to open search
 							</p>
 						</div>
 					</CommandEmpty>
 				)}
 
-				{!loading && query && results.length === 0 && (
-					<CommandEmpty>No results found for "{query}"</CommandEmpty>
+				{debouncedQuery.length >= 2 && isLoading && (
+					<CommandEmpty>Searching...</CommandEmpty>
 				)}
 
-				{/* Songs Section */}
-				{groupedResults.songs.length > 0 && (
-					<CommandGroup heading="Songs">
-						{groupedResults.songs.map((item) => (
-							<CommandItem
-								key={`${item.type}-${item.id}`}
-								onSelect={() => handleSelect(item)}
-								value={item.id}
-							>
-								<Music className="h-4 w-4" />
-								<div className="flex-1">
-									<div className="font-medium">{item.title}</div>
-									<div className="text-xs text-muted-foreground">
-										{item.subtitle}
-									</div>
-								</div>
-							</CommandItem>
-						))}
-					</CommandGroup>
+				{debouncedQuery.length >= 2 && !isLoading && !hasResults && (
+					<CommandEmpty>No results found for "{debouncedQuery}"</CommandEmpty>
 				)}
 
-				{/* Albums Section */}
-				{groupedResults.albums.length > 0 && (
-					<CommandGroup heading="Albums">
-						{groupedResults.albums.map((item) => (
-							<CommandItem
-								key={`${item.type}-${item.id}`}
-								onSelect={() => handleSelect(item)}
-								value={item.id}
-							>
-								<Disc3 className="h-4 w-4" />
-								<div className="flex-1">
-									<div className="font-medium">{item.title}</div>
-									<div className="text-xs text-muted-foreground">
-										{item.subtitle}
-									</div>
-								</div>
-							</CommandItem>
-						))}
-					</CommandGroup>
-				)}
-
-				{/* Artists Section */}
-				{groupedResults.artists.length > 0 && (
+				{searchResults && searchResults.artists.length > 0 && (
 					<CommandGroup heading="Artists">
-						{groupedResults.artists.map((item) => (
+						{searchResults.artists.slice(0, 5).map((artist) => (
 							<CommandItem
-								key={`${item.type}-${item.id}`}
-								onSelect={() => handleSelect(item)}
-								value={item.id}
+								key={artist.id}
+								value={`artist-${artist.id}-${artist.name}`}
+								onSelect={() => handleSelectArtist(artist)}
 							>
-								<User className="h-4 w-4" />
-								<div className="flex-1">
-									<div className="font-medium">{item.title}</div>
-									<div className="text-xs text-muted-foreground">
-										{item.subtitle}
-									</div>
+								<User className="mr-2 h-4 w-4 text-muted-foreground" />
+								<span className="flex-1 truncate">{artist.name}</span>
+								{artist.albumCount !== undefined && (
+									<span className="text-xs text-muted-foreground">
+										{artist.albumCount} album
+										{artist.albumCount !== 1 ? "s" : ""}
+									</span>
+								)}
+							</CommandItem>
+						))}
+					</CommandGroup>
+				)}
+
+				{searchResults &&
+					searchResults.artists.length > 0 &&
+					searchResults.albums.length > 0 && <CommandSeparator />}
+
+				{searchResults && searchResults.albums.length > 0 && (
+					<CommandGroup heading="Albums">
+						{searchResults.albums.slice(0, 5).map((album) => (
+							<CommandItem
+								key={album.id}
+								value={`album-${album.id}-${album.name}`}
+								onSelect={() => handleSelectAlbum(album)}
+							>
+								<Disc3 className="mr-2 h-4 w-4 text-muted-foreground" />
+								<div className="flex-1 min-w-0">
+									<span className="truncate block">{album.name}</span>
+									{album.artist && (
+										<span className="text-xs text-muted-foreground truncate block">
+											{album.artist}
+										</span>
+									)}
 								</div>
+								{album.year && (
+									<span className="text-xs text-muted-foreground">
+										{album.year}
+									</span>
+								)}
+							</CommandItem>
+						))}
+					</CommandGroup>
+				)}
+
+				{searchResults &&
+					searchResults.albums.length > 0 &&
+					searchResults.songs.length > 0 && <CommandSeparator />}
+
+				{searchResults && searchResults.songs.length > 0 && (
+					<CommandGroup heading="Songs">
+						{searchResults.songs.slice(0, 5).map((song) => (
+							<CommandItem
+								key={song.id}
+								value={`song-${song.id}-${song.title}`}
+								onSelect={() => handleSelectSong(song)}
+							>
+								<Music className="mr-2 h-4 w-4 text-muted-foreground" />
+								<div className="flex-1 min-w-0">
+									<span className="truncate block">{song.title}</span>
+									{song.artist && (
+										<span className="text-xs text-muted-foreground truncate block">
+											{song.artist}
+											{song.album && ` • ${song.album}`}
+										</span>
+									)}
+								</div>
+								<Play className="h-3 w-3 text-muted-foreground" />
 							</CommandItem>
 						))}
 					</CommandGroup>
