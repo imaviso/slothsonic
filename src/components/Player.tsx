@@ -11,11 +11,13 @@ import {
 	Shuffle,
 	SkipBack,
 	SkipForward,
+	Trash2,
 	Volume2,
 	VolumeX,
 	X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { AddToPlaylistButton } from "@/components/AddToPlaylistButton";
 import { LyricsPanel } from "@/components/LyricsPanel";
 import { QueueContextMenu } from "@/components/QueueContextMenu";
@@ -51,6 +53,7 @@ export function Player() {
 		setVolume,
 		playSong,
 		removeFromQueue,
+		clearQueue,
 		toggleShuffle,
 		toggleRepeat,
 	} = usePlayer();
@@ -413,15 +416,31 @@ export function Player() {
 			{showQueue && (
 				<div className="absolute bottom-full right-0 mb-2 w-80 max-h-96 bg-card border rounded-lg shadow-lg overflow-hidden">
 					<div className="flex items-center justify-between px-4 py-2 border-b">
-						<h3 className="font-medium text-sm">Queue</h3>
-						<Button
-							variant="ghost"
-							size="icon"
-							className="w-6 h-6"
-							onClick={() => setShowQueue(false)}
-						>
-							<X className="w-4 h-4" />
-						</Button>
+						<h3 className="font-medium text-sm">Queue ({queue.length})</h3>
+						<div className="flex items-center gap-1">
+							{queue.length > 1 && (
+								<Button
+									variant="ghost"
+									size="icon"
+									className="w-6 h-6"
+									onClick={() => {
+										clearQueue();
+										toast.success("Queue cleared");
+									}}
+									title="Clear queue"
+								>
+									<Trash2 className="w-4 h-4" />
+								</Button>
+							)}
+							<Button
+								variant="ghost"
+								size="icon"
+								className="w-6 h-6"
+								onClick={() => setShowQueue(false)}
+							>
+								<X className="w-4 h-4" />
+							</Button>
+						</div>
 					</div>
 					<div className="overflow-y-auto max-h-80 scrollbar-thin">
 						{queue.length === 0 ? (

@@ -402,10 +402,22 @@ export function playNextInQueue(song: Song) {
 }
 
 export function clearQueue() {
-	const audioEl = getAudio();
-	audioEl.pause();
-	audioEl.src = "";
-	updateState({ ...initialState });
+	const { queue, currentTrack } = playerState;
+
+	// If there's a current track, keep only that song in the queue
+	if (currentTrack && queue.length > 1) {
+		updateState({
+			queue: [currentTrack],
+			originalQueue: [currentTrack],
+			queueIndex: 0,
+		});
+	} else {
+		// Otherwise completely clear the queue
+		const audioEl = getAudio();
+		audioEl.pause();
+		audioEl.src = "";
+		updateState({ ...initialState });
+	}
 }
 
 export function removeFromQueue(index: number) {
