@@ -5,6 +5,7 @@ import {
 	Check,
 	ListMusic,
 	Loader2,
+	Music,
 	Pause,
 	Pencil,
 	Play,
@@ -50,6 +51,77 @@ function formatTotalDuration(seconds: number): string {
 		return `${hours} hr ${mins} min`;
 	}
 	return `${mins} min`;
+}
+
+interface SearchResultItemProps {
+	song: Song;
+	isSelected: boolean;
+	isAlreadyInPlaylist: boolean;
+	onToggle: () => void;
+}
+
+function SearchResultItem({
+	song,
+	isSelected,
+	isAlreadyInPlaylist,
+	onToggle,
+}: SearchResultItemProps) {
+	const [coverUrl, setCoverUrl] = useState<string | null>(null);
+
+	useEffect(() => {
+		if (song.coverArt) {
+			getCoverArtUrl(song.coverArt, 50).then(setCoverUrl);
+		}
+	}, [song.coverArt]);
+
+	return (
+		<button
+			type="button"
+			onClick={() => !isAlreadyInPlaylist && onToggle()}
+			disabled={isAlreadyInPlaylist}
+			className={cn(
+				"w-full flex items-center gap-3 p-2 rounded-md text-left transition-colors",
+				isAlreadyInPlaylist
+					? "opacity-50 cursor-not-allowed"
+					: isSelected
+						? "bg-primary/10 border border-primary"
+						: "hover:bg-muted",
+			)}
+		>
+			<div
+				className={cn(
+					"w-5 h-5 rounded border flex items-center justify-center flex-shrink-0",
+					isSelected
+						? "bg-primary border-primary text-primary-foreground"
+						: "border-muted-foreground",
+				)}
+			>
+				{isSelected && <Check className="w-3 h-3" />}
+			</div>
+			<div className="w-10 h-10 rounded overflow-hidden bg-muted flex-shrink-0">
+				{coverUrl ? (
+					<img
+						src={coverUrl}
+						alt={song.album}
+						className="w-full h-full object-cover"
+					/>
+				) : (
+					<div className="w-full h-full flex items-center justify-center">
+						<Music className="w-4 h-4 text-muted-foreground" />
+					</div>
+				)}
+			</div>
+			<div className="flex-1 min-w-0">
+				<p className="font-medium truncate">{song.title}</p>
+				<p className="text-sm text-muted-foreground truncate">
+					{song.artist} · {song.album}
+				</p>
+			</div>
+			{isAlreadyInPlaylist && (
+				<span className="text-xs text-muted-foreground">Already added</span>
+			)}
+		</button>
+	);
 }
 
 function PlaylistDetailPage() {
@@ -492,50 +564,15 @@ function PlaylistDetailPage() {
 										: "Searching..."}
 							</div>
 						) : (
-							searchResults.map((song) => {
-								const isSelected = selectedSongIds.has(song.id);
-								const isAlreadyInPlaylist = songs.some((s) => s.id === song.id);
-								return (
-									<button
-										type="button"
-										key={song.id}
-										onClick={() =>
-											!isAlreadyInPlaylist && toggleSongSelection(song.id)
-										}
-										disabled={isAlreadyInPlaylist}
-										className={cn(
-											"w-full flex items-center gap-3 p-2 rounded-md text-left transition-colors",
-											isAlreadyInPlaylist
-												? "opacity-50 cursor-not-allowed"
-												: isSelected
-													? "bg-primary/10 border border-primary"
-													: "hover:bg-muted",
-										)}
-									>
-										<div
-											className={cn(
-												"w-5 h-5 rounded border flex items-center justify-center flex-shrink-0",
-												isSelected
-													? "bg-primary border-primary text-primary-foreground"
-													: "border-muted-foreground",
-											)}
-										>
-											{isSelected && <Check className="w-3 h-3" />}
-										</div>
-										<div className="flex-1 min-w-0">
-											<p className="font-medium truncate">{song.title}</p>
-											<p className="text-sm text-muted-foreground truncate">
-												{song.artist} · {song.album}
-											</p>
-										</div>
-										{isAlreadyInPlaylist && (
-											<span className="text-xs text-muted-foreground">
-												Already added
-											</span>
-										)}
-									</button>
-								);
-							})
+							searchResults.map((song) => (
+								<SearchResultItem
+									key={song.id}
+									song={song}
+									isSelected={selectedSongIds.has(song.id)}
+									isAlreadyInPlaylist={songs.some((s) => s.id === song.id)}
+									onToggle={() => toggleSongSelection(song.id)}
+								/>
+							))
 						)}
 					</div>
 					<DialogFooter>
