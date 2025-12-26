@@ -95,8 +95,9 @@ function AppHome() {
 						Keyboard Shortcuts
 					</h3>
 				</div>
-				<div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+				<div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
 					<ShortcutHint keys={["⌘", "K"]} description="Search" />
+					<ShortcutHint keys={["⌘", "B"]} description="Sidebar" />
 					<ShortcutHint keys={["Space"]} description="Play / Pause" />
 					<ShortcutHint keys={["←", "→"]} description="Seek ±10s" />
 					<ShortcutHint keys={["↑", "↓"]} description="Volume" />
