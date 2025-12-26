@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect } from "react";
 
+import { GlobalSearch } from "@/components/GlobalSearch";
 import { Player } from "@/components/Player";
 import { Button } from "@/components/ui/button";
 import {
@@ -254,6 +255,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 		<SidebarProvider>
 			<AppSidebar />
 			<AppContent>{children}</AppContent>
+			<GlobalSearch />
 			<Toaster position="top-center" />
 		</SidebarProvider>
 	);
