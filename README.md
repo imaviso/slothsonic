@@ -1,5 +1,7 @@
 # Slothsonic
 
+<img src="./assets/slothsonic.png" alt="Slothsonic" width="400" />
+
 A modern desktop music player client for Subsonic/OpenSubsonic API servers (Navidrome, Airsonic, etc.).
 
 **Note:** This is a personal project.
