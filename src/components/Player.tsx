@@ -1,4 +1,3 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
 	ChevronDown,
@@ -19,7 +18,7 @@ import {
 	VolumeX,
 	X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { AddToPlaylistButton } from "@/components/AddToPlaylistButton";
@@ -36,13 +35,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { Song } from "@/lib/api";
-import { star, unstar } from "@/lib/api";
-import {
-	getTrackCoverUrl,
-	restoreQueueState,
-	updateCurrentTrackStarred,
-	usePlayer,
-} from "@/lib/player";
+import { getTrackCoverUrl, restoreQueueState, usePlayer } from "@/lib/player";
 import { cn } from "@/lib/utils";
 
 function formatTime(seconds: number): string {
@@ -118,43 +111,22 @@ export function Player() {
 		"player",
 	);
 
-	const queryClient = useQueryClient();
+	const volumeControlRef = useRef<HTMLDivElement>(null);
 
-	// Mutation for starring/unstarring current track via keyboard
-	const starMutation = useMutation({
-		mutationFn: async ({
-			songId,
-			shouldStar,
-		}: {
-			songId: string;
-			shouldStar: boolean;
-		}) => {
-			if (shouldStar) {
-				await star({ id: songId });
-			} else {
-				await unstar({ id: songId });
-			}
-		},
-		onMutate: ({ shouldStar }) => {
-			// Optimistically update the player state
-			updateCurrentTrackStarred(shouldStar);
-		},
-		onSuccess: (_, { shouldStar }) => {
-			toast.success(
-				shouldStar ? "Added to favorites" : "Removed from favorites",
-			);
-			queryClient.invalidateQueries({ queryKey: ["starred"] });
-		},
-		onError: (_, { shouldStar }) => {
-			// Revert optimistic update on error
-			updateCurrentTrackStarred(!shouldStar);
-			toast.error(
-				shouldStar
-					? "Failed to add to favorites"
-					: "Failed to remove from favorites",
-			);
-		},
-	});
+	// Handle wheel events for volume control with non-passive listener
+	useEffect(() => {
+		const element = volumeControlRef.current;
+		if (!element) return;
+
+		const handleWheel = (e: WheelEvent) => {
+			e.preventDefault();
+			const delta = e.deltaY > 0 ? -0.05 : 0.05;
+			setVolume(Math.max(0, Math.min(1, volume + delta)));
+		};
+
+		element.addEventListener("wheel", handleWheel, { passive: false });
+		return () => element.removeEventListener("wheel", handleWheel);
+	}, [volume, setVolume]);
 
 	useEffect(() => {
 		setCoverLoaded(false);
@@ -167,96 +139,6 @@ export function Player() {
 			setLargeCoverUrl(null);
 		}
 	}, [currentTrack?.coverArt]);
-
-	useEffect(() => {
-		const handleKeyDown = (e: KeyboardEvent) => {
-			const target = e.target as HTMLElement;
-			const isInputFocused =
-				target.tagName === "INPUT" ||
-				target.tagName === "TEXTAREA" ||
-				target.isContentEditable;
-
-			if (isInputFocused) return;
-
-			switch (e.code) {
-				case "Space":
-					e.preventDefault();
-					togglePlayPause();
-					break;
-				case "ArrowLeft":
-					e.preventDefault();
-					seek(Math.max(0, currentTime - 10));
-					break;
-				case "ArrowRight":
-					e.preventDefault();
-					seek(Math.min(duration || 0, currentTime + 10));
-					break;
-				case "ArrowUp":
-					e.preventDefault();
-					setVolume(Math.min(1, volume + 0.1));
-					break;
-				case "ArrowDown":
-					e.preventDefault();
-					setVolume(Math.max(0, volume - 0.1));
-					break;
-				case "KeyN":
-					e.preventDefault();
-					playNext();
-					break;
-				case "KeyP":
-					e.preventDefault();
-					playPrevious();
-					break;
-				case "KeyM":
-					e.preventDefault();
-					// Toggle mute
-					if (volume > 0) {
-						setPrevVolume(volume);
-						setVolume(0);
-					} else {
-						setVolume(prevVolume);
-					}
-					break;
-				case "KeyL":
-					e.preventDefault();
-					// Toggle favorite for current track
-					if (currentTrack) {
-						starMutation.mutate({
-							songId: currentTrack.id,
-							shouldStar: !currentTrack.starred,
-						});
-					}
-					break;
-				case "KeyR":
-					e.preventDefault();
-					toggleRepeat();
-					break;
-				case "KeyS":
-					e.preventDefault();
-					toggleShuffle();
-					break;
-				default:
-					break;
-			}
-		};
-
-		window.addEventListener("keydown", handleKeyDown);
-		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [
-		togglePlayPause,
-		seek,
-		playNext,
-		playPrevious,
-		setVolume,
-		currentTime,
-		duration,
-		volume,
-		prevVolume,
-		currentTrack,
-		starMutation,
-		toggleRepeat,
-		toggleShuffle,
-	]);
 
 	// Don't render if no track
 	if (!currentTrack) {
@@ -861,14 +743,7 @@ export function Player() {
 				>
 					<ListMusic className="w-4 h-4" />
 				</Button>
-				<div
-					className="flex items-center gap-1"
-					onWheel={(e) => {
-						e.preventDefault();
-						const delta = e.deltaY > 0 ? -0.05 : 0.05;
-						setVolume(Math.max(0, Math.min(1, volume + delta)));
-					}}
-				>
+				<div ref={volumeControlRef} className="flex items-center gap-1">
 					<Button
 						variant="ghost"
 						size="icon"

@@ -21,6 +21,132 @@ import { getSettings } from "./settings";
 
 let currentBackend: AudioBackend | null = null;
 let currentBackendType: "html5" | "mpv" = "html5";
+let mprisCleanupFns: Array<() => void> = [];
+
+// Send MPRIS metadata update
+function updateMprisMetadata(song: Song, coverUrl?: string) {
+	const api = window.electronAPI?.mpv;
+	if (!api || window.electronAPI?.platform !== "linux") return;
+
+	api.setMetadata({
+		title: song.title,
+		artist: song.artist,
+		album: song.album,
+		artUrl: coverUrl,
+		trackId: song.id,
+		length: song.duration,
+	});
+}
+
+// Send MPRIS playback status update
+function updateMprisPlaybackStatus(isPlaying: boolean) {
+	const api = window.electronAPI?.mpv;
+	if (!api || window.electronAPI?.platform !== "linux") return;
+
+	api.setPlaybackStatus(isPlaying ? "Playing" : "Paused");
+}
+
+// Send MPRIS position update
+function updateMprisPosition(time: number) {
+	const api = window.electronAPI?.mpv;
+	if (!api || window.electronAPI?.platform !== "linux") return;
+
+	api.setMprisPosition(time);
+}
+
+// Send MPRIS volume update
+function updateMprisVolume(volume: number) {
+	const api = window.electronAPI?.mpv;
+	if (!api || window.electronAPI?.platform !== "linux") return;
+
+	api.updateVolume(Math.round(volume * 100));
+}
+
+// Set up MPRIS control listeners for Next/Previous (handled at player level)
+// Also sets up play/pause/stop/seek listeners for HTML5 backend
+function setupMprisControlListeners() {
+	const mpv = window.electronAPI?.mpv;
+	if (!mpv || window.electronAPI?.platform !== "linux") return;
+
+	// Clean up any existing listeners
+	for (const cleanup of mprisCleanupFns) {
+		cleanup();
+	}
+	mprisCleanupFns = [];
+
+	// Next/Previous - always needed at player level (requires queue access)
+	if (mpv.onMprisNext) {
+		const cleanup = mpv.onMprisNext(() => {
+			playNext();
+		});
+		mprisCleanupFns.push(cleanup);
+	}
+
+	if (mpv.onMprisPrevious) {
+		const cleanup = mpv.onMprisPrevious(() => {
+			playPrevious();
+		});
+		mprisCleanupFns.push(cleanup);
+	}
+
+	// For HTML5 backend, we also need to handle play/pause/stop/seek at player level
+	// (MPV backend handles these in audio-backend.ts)
+	if (currentBackendType === "html5") {
+		if (mpv.onMprisPlayPause) {
+			const cleanup = mpv.onMprisPlayPause(() => {
+				togglePlayPause();
+			});
+			mprisCleanupFns.push(cleanup);
+		}
+
+		if (mpv.onMprisPlay) {
+			const cleanup = mpv.onMprisPlay(() => {
+				play();
+			});
+			mprisCleanupFns.push(cleanup);
+		}
+
+		if (mpv.onMprisPause) {
+			const cleanup = mpv.onMprisPause(() => {
+				pause();
+			});
+			mprisCleanupFns.push(cleanup);
+		}
+
+		if (mpv.onMprisStop) {
+			const cleanup = mpv.onMprisStop(() => {
+				const backend = getAudioBackend();
+				backend.stop();
+				updateState({ isPlaying: false, currentTime: 0 });
+			});
+			mprisCleanupFns.push(cleanup);
+		}
+
+		if (mpv.onMprisSeek) {
+			const cleanup = mpv.onMprisSeek((offset: number) => {
+				// Seek is relative offset in seconds
+				const newTime = playerState.currentTime + offset;
+				seek(Math.max(0, newTime));
+			});
+			mprisCleanupFns.push(cleanup);
+		}
+
+		if (mpv.onMprisSetPosition) {
+			const cleanup = mpv.onMprisSetPosition((position: number) => {
+				seek(position);
+			});
+			mprisCleanupFns.push(cleanup);
+		}
+
+		if (mpv.onMprisVolume) {
+			const cleanup = mpv.onMprisVolume((volume: number) => {
+				// Volume is 0-100, convert to 0-1
+				setVolume(volume / 100);
+			});
+			mprisCleanupFns.push(cleanup);
+		}
+	}
+}
 
 function getBackendEventHandlers(): AudioBackendEvents {
 	return {
@@ -35,6 +161,9 @@ function getBackendEventHandlers(): AudioBackendEvents {
 					position: time,
 				});
 			}
+
+			// Update MPRIS position (works for both HTML5 and MPV backends)
+			updateMprisPosition(time);
 
 			// Scrobble logic
 			const currentTrack = playerState.currentTrack;
@@ -198,6 +327,9 @@ function getAudioBackend(): AudioBackend {
 
 		currentBackend.setVolume(playerState.volume);
 		currentBackend.setEventHandlers(getBackendEventHandlers());
+
+		// Set up MPRIS control listeners (works for both backends on Linux)
+		setupMprisControlListeners();
 	}
 
 	return currentBackend;
@@ -256,8 +388,10 @@ if ("mediaSession" in navigator) {
 }
 
 function updateMediaSession(song: Song) {
-	if ("mediaSession" in navigator) {
-		getTrackCoverUrl(song.coverArt, 300).then((coverUrl) => {
+	// Get cover art URL first (needed for both Media Session and MPRIS)
+	getTrackCoverUrl(song.coverArt, 300).then((coverUrl) => {
+		// Update browser Media Session API (if available)
+		if ("mediaSession" in navigator) {
 			navigator.mediaSession.metadata = new MediaMetadata({
 				title: song.title,
 				artist: song.artist,
@@ -272,14 +406,20 @@ function updateMediaSession(song: Song) {
 						]
 					: [],
 			});
-		});
-	}
+		}
+
+		// Update MPRIS metadata (works for both HTML5 and MPV backends)
+		updateMprisMetadata(song, coverUrl || undefined);
+	});
 }
 
 function updateMediaSessionState(isPlaying: boolean) {
 	if ("mediaSession" in navigator) {
 		navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
 	}
+
+	// Update MPRIS playback status (works for both HTML5 and MPV backends)
+	updateMprisPlaybackStatus(isPlaying);
 }
 
 export type RepeatMode = "off" | "all" | "one";
@@ -454,13 +594,16 @@ export function togglePlayPause() {
 	const backend = getAudioBackend();
 	if (playerState.isPlaying) {
 		backend.pause();
+		updateState({ isPlaying: false });
 	} else if (playerState.currentTrack) {
 		backend.resume();
+		updateState({ isPlaying: true });
 	}
 }
 
 export function pause() {
 	getAudioBackend().pause();
+	updateState({ isPlaying: false });
 }
 
 export function play() {
@@ -528,6 +671,8 @@ export function setVolume(volume: number) {
 	backend.setVolume(clampedVolume);
 	updateState({ volume: clampedVolume });
 	saveVolumeToStorage(clampedVolume);
+	// Update MPRIS volume (works for both HTML5 and MPV backends)
+	updateMprisVolume(clampedVolume);
 }
 
 export function addToQueue(songs: Song[]) {

@@ -4,7 +4,7 @@ Instructions for AI agents working on this project.
 
 ## Project Overview
 
-This is a web-based music player client for Subsonic/OpenSubsonic API servers (Navidrome, Airsonic, etc.). Built with React 19 and modern tooling.
+Slothsonic is a music player client for Subsonic/OpenSubsonic API servers (Navidrome, Airsonic, etc.). Built with React 19 and modern tooling.
 
 ## Tech Stack
 

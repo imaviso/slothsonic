@@ -7,6 +7,13 @@ import { pid } from "node:process";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import MpvAPI from "node-mpv";
+import { initializeMpris, destroyMpris } from "./mpris.js";
+
+// Disable Chromium's built-in MPRIS integration on Linux
+// We use our own MPRIS service for better control over metadata (including cover art)
+if (process.platform === "linux") {
+	app.commandLine.appendSwitch("disable-features", "HardwareMediaKeyHandling,MediaSessionService");
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -90,6 +97,7 @@ const mpvLog = (action, error = null) => {
 const DEFAULT_MPV_PARAMETERS = [
 	"--idle=yes",
 	"--no-config",
+	"--no-terminal",
 	"--load-scripts=no",
 	"--prefetch-playlist=yes",
 ];
@@ -105,6 +113,7 @@ const createMpv = async (options = {}) => {
 
 	mpvLog(`Using MPV binary: ${effectiveBinary}`);
 
+	// Build parameters
 	const params = [...DEFAULT_MPV_PARAMETERS, ...extraParameters];
 
 	const mpv = new MpvAPI(
@@ -162,7 +171,7 @@ const createMpv = async (options = {}) => {
 		mpvLog("Failed to set initial volume", error);
 	}
 
-	// Event: playlist position changed (track ended, auto-next)
+	// Event: playlist position changed (track ended, auto-next) and pause state
 	mpv.on("status", (status) => {
 		if (status.property === "playlist-pos") {
 			if (status.value === -1) {
@@ -172,6 +181,14 @@ const createMpv = async (options = {}) => {
 			if (status.value !== 0) {
 				// Auto-advanced to next track
 				sendToRenderer("mpv:autoNext");
+			}
+		}
+		// Handle pause state changes via status event
+		if (status.property === "pause") {
+			if (status.value === true) {
+				sendToRenderer("mpv:stateChange", { playing: false, loading: false });
+			} else if (status.value === false) {
+				sendToRenderer("mpv:stateChange", { playing: true, loading: false });
 			}
 		}
 	});
@@ -497,7 +514,9 @@ function setupMpvIpcHandlers() {
 	// Pause
 	ipcMain.handle("mpv:pause", async () => {
 		try {
-			await getMpvInstance()?.pause();
+			const mpv = getMpvInstance();
+			if (!mpv) return;
+			await mpv.pause();
 		} catch (err) {
 			mpvLog("Failed to pause", err);
 		}
@@ -506,7 +525,9 @@ function setupMpvIpcHandlers() {
 	// Resume
 	ipcMain.handle("mpv:resume", async () => {
 		try {
-			await getMpvInstance()?.play();
+			const mpv = getMpvInstance();
+			if (!mpv) return;
+			await mpv.play();
 		} catch (err) {
 			mpvLog("Failed to resume", err);
 		}
@@ -524,26 +545,31 @@ function setupMpvIpcHandlers() {
 	// Seek to absolute position
 	ipcMain.handle("mpv:seek", async (_, time) => {
 		try {
-			await getMpvInstance()?.goToPosition(time);
+			const mpv = getMpvInstance();
+			if (!mpv) return;
+			await mpv.goToPosition(time);
 		} catch (err) {
 			mpvLog(`Failed to seek to ${time}`, err);
 		}
 	});
 
-	// Set volume (0-100)
-	ipcMain.handle("mpv:setVolume", async (_, volume) => {
-		// Store volume for new instances
-		currentVolume = Math.round(volume * 100);
-
+	// Set volume (0-100) - use 'on' for fire-and-forget (like Feishin)
+	ipcMain.on("mpv:volume", async (_, value) => {
 		try {
-			await getMpvInstance()?.volume(currentVolume);
+			if (value === undefined || value === null || value < 0 || value > 100) {
+				return;
+			}
+			currentVolume = Math.round(value);
+			const mpv = getMpvInstance();
+			if (!mpv) return;
+			await mpv.volume(currentVolume);
 		} catch (err) {
-			mpvLog(`Failed to set volume to ${currentVolume}`, err);
+			mpvLog(`Failed to set volume to ${value}`, err);
 		}
 	});
 
-	// Mute/unmute
-	ipcMain.handle("mpv:mute", async (_, mute) => {
+	// Mute/unmute - use 'on' for fire-and-forget
+	ipcMain.on("mpv:mute", async (_, mute) => {
 		try {
 			await getMpvInstance()?.mute(mute);
 		} catch (err) {
@@ -606,7 +632,6 @@ function createWindow() {
 			preload: path.join(__dirname, "preload.cjs"),
 			contextIsolation: true,
 			nodeIntegration: false,
-			sandbox: false, // Required for preload script to work properly
 		},
 		titleBarStyle: "hiddenInset",
 		trafficLightPosition: { x: 16, y: 16 },
@@ -674,6 +699,7 @@ app.on("before-quit", async (event) => {
 				mpvState = MpvState.IN_PROGRESS;
 				event.preventDefault();
 				await cleanupMpv();
+				await destroyMpris();
 			} catch (err) {
 				mpvLog("Failed to cleanup before quit", err);
 			} finally {
@@ -723,7 +749,13 @@ process.on("unhandledRejection", async (reason) => {
 });
 
 // Start the app
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
 	setupMpvIpcHandlers();
 	createWindow();
+	
+	// Initialize MPRIS for Linux desktop integration
+	// The mpris.js module handles all event handlers and IPC internally
+	if (process.platform === "linux") {
+		initializeMpris(() => mainWindow);
+	}
 });

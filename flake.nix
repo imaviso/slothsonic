@@ -1,5 +1,5 @@
 {
-  description = "Subsonic client - A web-based music player for Subsonic/OpenSubsonic API servers";
+  description = "Slothsonic - A music player for Subsonic/OpenSubsonic servers";
 
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
@@ -49,7 +49,7 @@
 
         # Build the frontend assets
         frontendBuild = pkgs.buildNpmPackage {
-          pname = "subsonic-client-frontend";
+          pname = "slothsonic-frontend";
           version = "1.0.0";
 
           src = ./.;
@@ -89,8 +89,8 @@
           '';
         };
 
-        subsonic-client = pkgs.stdenv.mkDerivation {
-          pname = "subsonic-client";
+        slothsonic = pkgs.stdenv.mkDerivation {
+          pname = "slothsonic";
           version = "1.0.0";
 
           src = frontendBuild;
@@ -100,47 +100,47 @@
           buildInputs = runtimeDeps;
 
           installPhase = ''
-            mkdir -p $out/lib/subsonic-client
+            mkdir -p $out/lib/slothsonic
             mkdir -p $out/bin
             mkdir -p $out/share/applications
             mkdir -p $out/share/icons/hicolor/512x512/apps
 
             # Copy from frontend build
-            cp -r $src/* $out/lib/subsonic-client/
+            cp -r $src/* $out/lib/slothsonic/
 
             # Copy icon from source
-            cp ${./public/logo512.png} $out/share/icons/hicolor/512x512/apps/subsonic-client.png
+            cp ${./public/logo512.png} $out/share/icons/hicolor/512x512/apps/slothsonic.png
 
             # Create desktop entry
-            cat > $out/share/applications/subsonic-client.desktop << EOF
+            cat > $out/share/applications/slothsonic.desktop << EOF
 [Desktop Entry]
-Name=Subsonic Client
+Name=Slothsonic
 Comment=Music player for Subsonic/OpenSubsonic servers
-Exec=subsonic-client
-Icon=subsonic-client
+Exec=slothsonic
+Icon=slothsonic
 Terminal=false
 Type=Application
 Categories=Audio;Music;Player;
 EOF
 
             # Create wrapper script
-            makeWrapper ${pkgs.electron}/bin/electron $out/bin/subsonic-client \
-              --add-flags "$out/lib/subsonic-client" \
+            makeWrapper ${pkgs.electron}/bin/electron $out/bin/slothsonic \
+              --add-flags "$out/lib/slothsonic" \
               --prefix PATH : ${pkgs.lib.makeBinPath [pkgs.mpv]} \
               --prefix LD_LIBRARY_PATH : "${runtimeLibPath}"
           '';
 
           meta = with pkgs.lib; {
-            description = "A web-based music player for Subsonic/OpenSubsonic API servers";
+            description = "Slothsonic - A music player for Subsonic/OpenSubsonic servers";
             license = licenses.mit;
             platforms = platforms.linux;
-            mainProgram = "subsonic-client";
+            mainProgram = "slothsonic";
           };
         };
       in {
         packages = {
-          default = subsonic-client;
-          subsonic-client = subsonic-client;
+          default = slothsonic;
+          slothsonic = slothsonic;
         };
 
         devShells.default = pkgs.mkShell {
@@ -151,6 +151,11 @@ EOF
             electron
             # MPV for audio backend
             mpv
+            # MPRIS testing
+            playerctl
+            # Required for native module compilation (mpris-service)
+            python3
+            pkg-config
             # Required for electron-builder
             dpkg
             fakeroot

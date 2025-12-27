@@ -32,8 +32,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		resume: () => ipcRenderer.invoke("mpv:resume"),
 		stop: () => ipcRenderer.invoke("mpv:stop"),
 		seek: (time) => ipcRenderer.invoke("mpv:seek", time),
-		setVolume: (volume) => ipcRenderer.invoke("mpv:setVolume", volume),
-		mute: (mute) => ipcRenderer.invoke("mpv:mute", mute),
+		volume: (value) => ipcRenderer.send("mpv:volume", value),
+		mute: (mute) => ipcRenderer.send("mpv:mute", mute),
+		setMetadata: (metadata) => ipcRenderer.send("mpris:updateSong", metadata),
+		setPlaybackStatus: (status) => ipcRenderer.send("mpris:updatePlaybackStatus", status),
+		setMprisPosition: (seconds) => ipcRenderer.send("mpris:updatePosition", seconds),
+		updateSeek: (seconds) => ipcRenderer.send("mpris:updateSeek", seconds),
+		updateVolume: (volume) => ipcRenderer.send("mpris:updateVolume", volume),
 
 		// State queries
 		getPosition: () => ipcRenderer.invoke("mpv:getPosition"),
@@ -69,6 +74,53 @@ contextBridge.exposeInMainWorld("electronAPI", {
 			const handler = (_, isError) => callback(isError);
 			ipcRenderer.on("mpv:fallback", handler);
 			return () => ipcRenderer.removeListener("mpv:fallback", handler);
+		},
+
+		// MPRIS control events (from D-Bus)
+		onMprisPlay: (callback) => {
+			const handler = () => callback();
+			ipcRenderer.on("mpris:play", handler);
+			return () => ipcRenderer.removeListener("mpris:play", handler);
+		},
+		onMprisPause: (callback) => {
+			const handler = () => callback();
+			ipcRenderer.on("mpris:pause", handler);
+			return () => ipcRenderer.removeListener("mpris:pause", handler);
+		},
+		onMprisPlayPause: (callback) => {
+			const handler = () => callback();
+			ipcRenderer.on("mpris:playPause", handler);
+			return () => ipcRenderer.removeListener("mpris:playPause", handler);
+		},
+		onMprisStop: (callback) => {
+			const handler = () => callback();
+			ipcRenderer.on("mpris:stop", handler);
+			return () => ipcRenderer.removeListener("mpris:stop", handler);
+		},
+		onMprisNext: (callback) => {
+			const handler = () => callback();
+			ipcRenderer.on("mpris:next", handler);
+			return () => ipcRenderer.removeListener("mpris:next", handler);
+		},
+		onMprisPrevious: (callback) => {
+			const handler = () => callback();
+			ipcRenderer.on("mpris:previous", handler);
+			return () => ipcRenderer.removeListener("mpris:previous", handler);
+		},
+		onMprisSeek: (callback) => {
+			const handler = (_, offset) => callback(offset);
+			ipcRenderer.on("mpris:seek", handler);
+			return () => ipcRenderer.removeListener("mpris:seek", handler);
+		},
+		onMprisSetPosition: (callback) => {
+			const handler = (_, position) => callback(position);
+			ipcRenderer.on("mpris:setPosition", handler);
+			return () => ipcRenderer.removeListener("mpris:setPosition", handler);
+		},
+		onMprisVolume: (callback) => {
+			const handler = (_, volume) => callback(volume);
+			ipcRenderer.on("mpris:volume", handler);
+			return () => ipcRenderer.removeListener("mpris:volume", handler);
 		},
 	},
 });

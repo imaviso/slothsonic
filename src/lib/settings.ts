@@ -15,7 +15,7 @@ export interface Settings {
 // Storage
 // ============================================================================
 
-const SETTINGS_STORAGE_KEY = "subsonic-settings";
+const SETTINGS_STORAGE_KEY = "slothsonic-settings";
 
 const defaultSettings: Settings = {
 	audioBackend: "html5",
@@ -108,8 +108,20 @@ declare global {
 				resume: () => Promise<void>;
 				stop: () => Promise<void>;
 				seek: (time: number) => Promise<void>;
-				setVolume: (volume: number) => Promise<void>;
-				mute: (mute: boolean) => Promise<void>;
+				volume: (value: number) => void;
+				mute: (mute: boolean) => void;
+				setMetadata: (metadata: {
+					title: string;
+					artist?: string;
+					album?: string;
+					artUrl?: string;
+					trackId?: string;
+					length?: number;
+				}) => void;
+				setPlaybackStatus: (status: "Playing" | "Paused" | "Stopped") => void;
+				setMprisPosition: (seconds: number) => void;
+				updateSeek: (seconds: number) => void;
+				updateVolume: (volume: number) => void;
 
 				// State queries
 				getPosition: () => Promise<number>;
@@ -126,6 +138,19 @@ declare global {
 					callback: (state: { playing: boolean; loading: boolean }) => void,
 				) => () => void;
 				onFallback: (callback: (isError: boolean) => void) => () => void;
+
+				// MPRIS control events (from D-Bus)
+				onMprisPlay: (callback: () => void) => () => void;
+				onMprisPause: (callback: () => void) => () => void;
+				onMprisPlayPause: (callback: () => void) => () => void;
+				onMprisStop: (callback: () => void) => () => void;
+				onMprisNext: (callback: () => void) => () => void;
+				onMprisPrevious: (callback: () => void) => () => void;
+				onMprisSeek: (callback: (offset: number) => void) => () => void;
+				onMprisSetPosition: (
+					callback: (position: number) => void,
+				) => () => void;
+				onMprisVolume: (callback: (volume: number) => void) => () => void;
 			};
 		};
 	}

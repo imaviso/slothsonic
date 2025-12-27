@@ -38,6 +38,7 @@ import {
 	useSidebar,
 } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
+import { useGlobalKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useAuth } from "@/lib/auth";
 import {
 	enableQueueSync,
@@ -166,27 +167,24 @@ function AppSidebar() {
 						</SidebarMenuItem>
 					)}
 					<SidebarMenuItem>
-						<SidebarMenuButton size="lg" tooltip={credentials?.username}>
-							<div className="flex aspect-square size-8 items-center justify-center rounded-full bg-muted">
+						{/* User info section - using div instead of SidebarMenuButton to avoid nested buttons */}
+						<div className="flex items-center gap-2 px-2 py-1.5 w-full">
+							<div className="flex aspect-square size-8 items-center justify-center rounded-full bg-muted flex-shrink-0">
 								<span className="text-xs font-medium text-muted-foreground">
 									{credentials?.username?.charAt(0).toUpperCase()}
 								</span>
 							</div>
-							<div className="grid flex-1 text-left text-sm leading-tight">
+							<div className="grid flex-1 text-left text-sm leading-tight min-w-0 group-data-[collapsible=icon]:hidden">
 								<span className="truncate font-medium">
 									{credentials?.username}
 								</span>
 							</div>
-							<div className="flex items-center gap-1">
+							<div className="flex items-center gap-1 group-data-[collapsible=icon]:hidden">
 								<Button
 									variant="ghost"
 									size="icon"
 									className="size-7"
-									onClick={(e) => {
-										e.preventDefault();
-										e.stopPropagation();
-										toggleTheme();
-									}}
+									onClick={toggleTheme}
 									title={theme === "dark" ? "Light mode" : "Dark mode"}
 								>
 									{theme === "dark" ? (
@@ -199,17 +197,13 @@ function AppSidebar() {
 									variant="ghost"
 									size="icon"
 									className="size-7"
-									onClick={(e) => {
-										e.preventDefault();
-										e.stopPropagation();
-										handleLogout();
-									}}
+									onClick={handleLogout}
 									title="Sign out"
 								>
 									<LogOut className="size-4" />
 								</Button>
 							</div>
-						</SidebarMenuButton>
+						</div>
 					</SidebarMenuItem>
 				</SidebarMenu>
 			</SidebarFooter>
@@ -222,6 +216,9 @@ function AppSidebar() {
 function AppContent({ children }: { children: React.ReactNode }) {
 	const { currentTrack } = usePlayer();
 	const hasPlayer = currentTrack !== null;
+
+	// Global keyboard shortcuts for player controls
+	useGlobalKeyboardShortcuts();
 
 	// Enable queue sync and restore queue on mount
 	useEffect(() => {

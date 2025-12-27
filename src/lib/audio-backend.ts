@@ -259,6 +259,69 @@ export class MpvAudioBackend implements AudioBackend {
 			this.handlers?.onFallback(shouldFallback);
 		});
 		this.cleanupFns.push(cleanupFallback);
+
+		// MPRIS control event listeners
+		if (mpv.onMprisPlayPause) {
+			const cleanupMprisPlayPause = mpv.onMprisPlayPause(() => {
+				if (this.playing) {
+					this.pause();
+				} else {
+					this.resume();
+				}
+			});
+			this.cleanupFns.push(cleanupMprisPlayPause);
+		}
+
+		if (mpv.onMprisPlay) {
+			const cleanupMprisPlay = mpv.onMprisPlay(() => {
+				this.resume();
+			});
+			this.cleanupFns.push(cleanupMprisPlay);
+		}
+
+		if (mpv.onMprisPause) {
+			const cleanupMprisPause = mpv.onMprisPause(() => {
+				this.pause();
+			});
+			this.cleanupFns.push(cleanupMprisPause);
+		}
+
+		if (mpv.onMprisStop) {
+			const cleanupMprisStop = mpv.onMprisStop(() => {
+				this.stop();
+			});
+			this.cleanupFns.push(cleanupMprisStop);
+		}
+
+		if (mpv.onMprisSeek) {
+			const cleanupMprisSeek = mpv.onMprisSeek((offset: number) => {
+				// Seek is relative offset in seconds
+				const newTime = this.currentTime + offset;
+				this.seek(Math.max(0, newTime));
+			});
+			this.cleanupFns.push(cleanupMprisSeek);
+		}
+
+		if (mpv.onMprisSetPosition) {
+			const cleanupMprisSetPosition = mpv.onMprisSetPosition(
+				(position: number) => {
+					// SetPosition is absolute position in seconds
+					this.seek(position);
+				},
+			);
+			this.cleanupFns.push(cleanupMprisSetPosition);
+		}
+
+		if (mpv.onMprisVolume) {
+			const cleanupMprisVolume = mpv.onMprisVolume((volume: number) => {
+				// Volume is 0-100, convert to 0-1
+				this.setVolume(volume / 100);
+			});
+			this.cleanupFns.push(cleanupMprisVolume);
+		}
+
+		// Note: onMprisNext and onMprisPrevious are handled at the player level
+		// since they need access to the queue state
 	}
 
 	async play(url: string): Promise<void> {
@@ -340,7 +403,8 @@ export class MpvAudioBackend implements AudioBackend {
 		const mpv = window.electronAPI?.mpv;
 		if (!mpv) return;
 		this.volume = Math.max(0, Math.min(1, volume));
-		mpv.setVolume(this.volume);
+		// Convert 0-1 to 0-100 and use fire-and-forget (send, not invoke)
+		mpv.volume(Math.round(this.volume * 100));
 	}
 
 	getCurrentTime(): number {
@@ -376,15 +440,4 @@ export class MpvAudioBackend implements AudioBackend {
 		this.handlers = null;
 		this.initialized = false;
 	}
-}
-
-// ============================================================================
-// Backend Factory
-// ============================================================================
-
-export function createAudioBackend(type: "html5" | "mpv"): AudioBackend {
-	if (type === "mpv" && window.electronAPI?.mpv) {
-		return new MpvAudioBackend();
-	}
-	return new Html5AudioBackend();
 }

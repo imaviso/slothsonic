@@ -231,7 +231,7 @@ export async function getAuthParams(
 		t: token,
 		s: salt,
 		v: "1.16.1", // Subsonic API version
-		c: "subsonic-web-client", // Client identifier
+		c: "slothsonic", // Client identifier
 		f: "json", // Response format
 	});
 

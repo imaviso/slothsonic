@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 type Theme = "light" | "dark" | "system";
 
-const THEME_KEY = "subsonic-theme";
+const THEME_KEY = "slothsonic-theme";
 
 function getSystemTheme(): "light" | "dark" {
 	if (typeof window === "undefined") return "light";

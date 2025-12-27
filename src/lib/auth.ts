@@ -11,7 +11,7 @@ interface AuthState {
 	isAuthenticated: boolean;
 }
 
-const AUTH_STORAGE_KEY = "subsonic-auth";
+const AUTH_STORAGE_KEY = "slothsonic-auth";
 
 function getStoredCredentials(): SubsonicCredentials | null {
 	try {
