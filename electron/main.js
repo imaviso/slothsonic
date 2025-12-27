@@ -17,7 +17,8 @@ if (process.platform === "win32") {
 }
 
 let mainWindow = null;
-const isDev = !app.isPackaged;
+// Check if we're in dev mode: either not packaged OR dist folder doesn't exist
+const isDev = !app.isPackaged && !existsSync(path.join(__dirname, "../dist"));
 
 // ============================================================================
 // MPV Controller using node-mpv
