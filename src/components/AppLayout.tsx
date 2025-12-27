@@ -168,7 +168,7 @@ function AppSidebar() {
 					)}
 					<SidebarMenuItem>
 						{/* User info section - using div instead of SidebarMenuButton to avoid nested buttons */}
-						<div className="flex items-center gap-2 px-2 py-1.5 w-full">
+						<div className="flex items-center gap-2 px-2 py-1.5 w-full group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0">
 							<div className="flex aspect-square size-8 items-center justify-center rounded-full bg-muted flex-shrink-0">
 								<span className="text-xs font-medium text-muted-foreground">
 									{credentials?.username?.charAt(0).toUpperCase()}

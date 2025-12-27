@@ -25,22 +25,6 @@ function applyThemeClass(theme: Theme) {
 }
 
 function applyThemeWithTransition(theme: Theme) {
-	// Get click position from CSS custom properties (set by AppLayout click handler)
-	const x = getComputedStyle(document.documentElement)
-		.getPropertyValue("--click-x")
-		.trim();
-	const y = getComputedStyle(document.documentElement)
-		.getPropertyValue("--click-y")
-		.trim();
-
-	// Calculate the maximum radius needed to cover the entire screen
-	const clickX = Number.parseInt(x, 10) || window.innerWidth / 2;
-	const clickY = Number.parseInt(y, 10) || window.innerHeight / 2;
-	const maxRadius = Math.hypot(
-		Math.max(clickX, window.innerWidth - clickX),
-		Math.max(clickY, window.innerHeight - clickY),
-	);
-
 	// Check if View Transitions API is supported
 	if (!document.startViewTransition) {
 		applyThemeClass(theme);
@@ -76,25 +60,9 @@ function applyThemeWithTransition(theme: Theme) {
 		if (el) el.style.viewTransitionName = "none";
 	}
 
+	// Simple crossfade transition - let CSS handle the animation
 	const transition = document.startViewTransition(() => {
 		applyThemeClass(theme);
-	});
-
-	transition.ready.then(() => {
-		// Animate the circle expanding from click position
-		document.documentElement.animate(
-			{
-				clipPath: [
-					`circle(0px at ${clickX}px ${clickY}px)`,
-					`circle(${maxRadius}px at ${clickX}px ${clickY}px)`,
-				],
-			},
-			{
-				duration: 400,
-				easing: "ease-out",
-				pseudoElement: "::view-transition-new(root)",
-			},
-		);
 	});
 
 	transition.finished.then(() => {

@@ -195,33 +195,43 @@ code {
   navigation: auto;
 }
 
-/* Default click position (center of screen) */
-:root {
-  --click-x: 50vw;
-  --click-y: 50vh;
-}
-
-/* Theme transition - disable default animations, we use JS for circle animation */
+/* Theme transition - simple crossfade */
 html[data-theme-transition] {
   &::view-transition-old(root),
   &::view-transition-new(root) {
-    animation: none;
+    animation-duration: 150ms;
+    animation-timing-function: ease-out;
     mix-blend-mode: normal;
-  }
-
-  &::view-transition-new(root) {
-    z-index: 1;
-  }
-
-  &::view-transition-old(root) {
-    z-index: -1;
   }
 }
 
-/* Only animate the main content area */
+/* Page navigation transitions - subtle and native feel */
 ::view-transition-old(main-content) {
-  animation: none;
-  opacity: 0;
+  animation: page-fade-out 150ms ease-out forwards;
+}
+
+::view-transition-new(main-content) {
+  animation: page-fade-in 200ms ease-out;
+}
+
+@keyframes page-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 ::view-transition-new(main-content) {
@@ -259,7 +269,9 @@ html[data-theme-transition] {
 /* Reduce motion for users who prefer it */
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-old(main-content),
-  ::view-transition-new(main-content) {
+  ::view-transition-new(main-content),
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
     animation: none;
   }
 }
