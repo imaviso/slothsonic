@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import {
 	ChevronDown,
 	ChevronUp,
@@ -161,6 +161,52 @@ export function Player() {
 			setLargeCoverUrl(null);
 		}
 	}, [currentTrack?.coverArt]);
+
+	// Close expanded player on route change or navigation click
+	const location = useLocation();
+	const prevPathnameRef = useRef(location.pathname);
+	useEffect(() => {
+		if (prevPathnameRef.current !== location.pathname) {
+			setIsExpanded(false);
+			prevPathnameRef.current = location.pathname;
+		}
+	}, [location.pathname]);
+
+	// Close expanded player when clicking navigation links (handles same-route clicks like Home -> Home)
+	useEffect(() => {
+		if (!isExpanded) return;
+
+		const handleClick = (e: MouseEvent) => {
+			const target = e.target as HTMLElement;
+			// Check if click is inside the sidebar navigation area
+			const isInSidebar = target.closest("[data-sidebar='sidebar']");
+			const isNavLink = target.closest("a[href]");
+			// Check if click is on a context menu navigation item
+			const isContextMenuItem = target.closest(
+				"[data-slot='context-menu-item']",
+			);
+
+			if ((isInSidebar && isNavLink) || isContextMenuItem) {
+				setIsExpanded(false);
+			}
+		};
+
+		// Use capture phase to catch clicks before they're handled
+		document.addEventListener("click", handleClick, true);
+		return () => document.removeEventListener("click", handleClick, true);
+	}, [isExpanded]);
+
+	// Close expanded player on ESC key
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === "Escape" && isExpanded) {
+				setIsExpanded(false);
+			}
+		};
+
+		document.addEventListener("keydown", handleKeyDown);
+		return () => document.removeEventListener("keydown", handleKeyDown);
+	}, [isExpanded]);
 
 	// Don't render if no track
 	if (!currentTrack) {
@@ -493,6 +539,8 @@ export function Player() {
 						songId={currentTrack.id}
 						songTitle={currentTrack.title}
 						songArtist={currentTrack.artist ?? ""}
+						currentTime={currentTime}
+						onSeek={seek}
 						onClose={() => setMobileTab("player")}
 						showHeader={false}
 					/>
@@ -793,7 +841,7 @@ export function Player() {
 				</div>
 
 				{/* Right side - Tabbed Queue/Lyrics panel */}
-				<div className="w-96 border-l flex flex-col shrink-0 bg-background/50">
+				<div className="w-[28rem] border-l flex flex-col shrink-0 bg-background/50">
 					{/* Tab header */}
 					<div className="flex items-center border-b shrink-0">
 						<button
@@ -919,6 +967,8 @@ export function Player() {
 								songId={currentTrack.id}
 								songTitle={currentTrack.title}
 								songArtist={currentTrack.artist ?? ""}
+								currentTime={currentTime}
+								onSeek={seek}
 								onClose={() => setExpandedTab("queue")}
 								showHeader={false}
 							/>
@@ -1164,7 +1214,7 @@ export function Player() {
 		<>
 			{/* Queue Drawer */}
 			<Drawer open={showQueue} onOpenChange={setShowQueue} direction="right">
-				<DrawerContent className="h-full w-96 rounded-none">
+				<DrawerContent className="h-full w-[28rem] rounded-none">
 					<div className="flex flex-col h-full">
 						<div className="flex items-center justify-between px-4 py-3 border-b">
 							<DrawerTitle className="font-semibold">
@@ -1272,6 +1322,8 @@ export function Player() {
 								songId={currentTrack.id}
 								songTitle={currentTrack.title}
 								songArtist={currentTrack.artist ?? ""}
+								currentTime={currentTime}
+								onSeek={seek}
 								onClose={() => setShowLyrics(false)}
 								showHeader={false}
 							/>

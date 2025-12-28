@@ -1,23 +1,141 @@
 import { useQuery } from "@tanstack/react-query";
 import { FileText, X } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
-import { getLyrics, getLyricsBySongId } from "@/lib/api";
+import { getLyrics, getLyricsBySongId, type StructuredLyrics } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 interface LyricsPanelProps {
 	songId?: string;
 	songTitle: string;
 	songArtist: string;
+	currentTime?: number; // Current playback time in seconds
 	onClose: () => void;
 	showHeader?: boolean;
+	onSeek?: (time: number) => void; // Callback to seek to a specific time
+}
+
+// Component for synced lyrics with animation
+function SyncedLyrics({
+	lyrics,
+	currentTime,
+	onSeek,
+}: {
+	lyrics: StructuredLyrics;
+	currentTime: number;
+	onSeek?: (time: number) => void;
+}) {
+	const containerRef = useRef<HTMLDivElement>(null);
+	const activeLineRef = useRef<HTMLButtonElement>(null);
+
+	// Find the current line based on playback time
+	const currentTimeMs = currentTime * 1000;
+	let currentLineIndex = -1;
+
+	for (let i = 0; i < lyrics.line.length; i++) {
+		const line = lyrics.line[i];
+		const nextLine = lyrics.line[i + 1];
+
+		if (line.start === undefined) continue;
+
+		const lineStart = line.start + (lyrics.offset ?? 0);
+		const lineEnd = nextLine?.start
+			? nextLine.start + (lyrics.offset ?? 0)
+			: Number.POSITIVE_INFINITY;
+
+		if (currentTimeMs >= lineStart && currentTimeMs < lineEnd) {
+			currentLineIndex = i;
+			break;
+		}
+	}
+
+	// Auto-scroll to keep the active line centered
+	// biome-ignore lint/correctness/useExhaustiveDependencies: currentLineIndex is derived from currentTime but we need to trigger scroll when line changes
+	useEffect(() => {
+		if (activeLineRef.current && containerRef.current) {
+			const container = containerRef.current;
+			const activeLine = activeLineRef.current;
+
+			const containerHeight = container.clientHeight;
+			const lineTop = activeLine.offsetTop;
+			const lineHeight = activeLine.clientHeight;
+
+			// Scroll to center the active line
+			const scrollTo = lineTop - containerHeight / 2 + lineHeight / 2;
+
+			container.scrollTo({
+				top: scrollTo,
+				behavior: "smooth",
+			});
+		}
+	}, [currentLineIndex]);
+
+	const handleLineClick = (startTime: number | undefined) => {
+		if (startTime !== undefined && onSeek) {
+			// Convert milliseconds to seconds and account for offset
+			const seekTime = (startTime + (lyrics.offset ?? 0)) / 1000;
+			onSeek(seekTime);
+		}
+	};
+
+	return (
+		<div
+			ref={containerRef}
+			className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin py-8"
+		>
+			<div className="space-y-4 px-4">
+				{lyrics.line.map((line, index) => {
+					const isActive = index === currentLineIndex;
+					const isPast = currentLineIndex > -1 && index < currentLineIndex;
+					const hasTimestamp = line.start !== undefined;
+
+					return (
+						<button
+							key={`${line.start}-${index}`}
+							ref={isActive ? activeLineRef : null}
+							type="button"
+							onClick={() => handleLineClick(line.start)}
+							disabled={!hasTimestamp || !onSeek}
+							className={cn(
+								"block w-full text-left transition-all duration-300 ease-out",
+								hasTimestamp && onSeek && "cursor-pointer hover:opacity-80",
+								!hasTimestamp && "cursor-default",
+								isActive
+									? "text-primary text-xl font-bold"
+									: isPast
+										? "text-muted-foreground/50 text-base"
+										: "text-foreground/70 text-base",
+							)}
+						>
+							{line.value || <span className="opacity-0">♪</span>}
+						</button>
+					);
+				})}
+			</div>
+		</div>
+	);
+}
+
+// Component for static (unsynced) lyrics
+function StaticLyrics({ text }: { text: string }) {
+	return (
+		<div className="flex-1 overflow-y-auto scrollbar-thin">
+			<p className="whitespace-pre-wrap text-foreground/90 leading-relaxed">
+				{text}
+			</p>
+		</div>
+	);
 }
 
 export function LyricsPanel({
 	songId,
 	songTitle,
 	songArtist,
+	currentTime = 0,
 	onClose,
 	showHeader = true,
+	onSeek,
 }: LyricsPanelProps) {
 	// Try getLyricsBySongId first (OpenSubsonic extension)
 	const {
@@ -44,19 +162,26 @@ export function LyricsPanel({
 
 	const isLoading = isLoadingById || (shouldFallback && isLoadingByTitle);
 
-	// Extract lyrics text from either API response
-	let lyricsText: string | undefined;
+	// Determine which lyrics to display and how
+	let syncedLyrics: StructuredLyrics | null = null;
+	let staticLyricsText: string | undefined;
 
 	if (structuredLyrics && structuredLyrics.length > 0) {
-		// Use structured lyrics from getLyricsBySongId
-		// Prefer unsynced lyrics, or use the first available
-		const preferredLyrics =
-			structuredLyrics.find((l) => !l.synced) ?? structuredLyrics[0];
-		lyricsText = preferredLyrics.line.map((l) => l.value).join("\n");
+		// Prefer synced lyrics if available
+		const synced = structuredLyrics.find((l) => l.synced);
+		if (synced) {
+			syncedLyrics = synced;
+		} else {
+			// Use unsynced structured lyrics as static text
+			const unsynced = structuredLyrics[0];
+			staticLyricsText = unsynced.line.map((l) => l.value).join("\n");
+		}
 	} else if (lyrics) {
 		// Use lyrics from getLyrics
-		lyricsText = lyrics.value ?? lyrics.lyrics?.[0]?.value;
+		staticLyricsText = lyrics.value ?? lyrics.lyrics?.[0]?.value;
 	}
+
+	const hasLyrics = syncedLyrics || staticLyricsText;
 
 	return (
 		<div className="p-6 space-y-4 h-full flex flex-col">
@@ -78,21 +203,25 @@ export function LyricsPanel({
 			)}
 
 			{isLoading ? (
-				<div className="animate-pulse space-y-3">
+				<div className="animate-pulse space-y-3 flex-1">
 					<div className="h-4 bg-muted rounded w-3/4" />
 					<div className="h-4 bg-muted rounded w-1/2" />
 					<div className="h-4 bg-muted rounded w-2/3" />
 					<div className="h-4 bg-muted rounded w-full" />
 					<div className="h-4 bg-muted rounded w-1/2" />
 				</div>
-			) : !lyricsText ? (
+			) : !hasLyrics ? (
 				<p className="text-sm text-muted-foreground">
 					No lyrics available for this song
 				</p>
+			) : syncedLyrics ? (
+				<SyncedLyrics
+					lyrics={syncedLyrics}
+					currentTime={currentTime}
+					onSeek={onSeek}
+				/>
 			) : (
-				<div className="prose prose-sm dark:prose-invert flex-1 overflow-y-auto scrollbar-thin">
-					<p className="whitespace-pre-wrap">{lyricsText}</p>
-				</div>
+				<StaticLyrics text={staticLyricsText ?? ""} />
 			)}
 		</div>
 	);
