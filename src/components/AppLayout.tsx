@@ -241,7 +241,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
 	}, []);
 
 	return (
-		<SidebarInset className="h-svh flex flex-col">
+		<SidebarInset className="h-svh flex flex-col overflow-hidden">
 			{/* Mobile header */}
 			<header
 				className="flex h-14 items-center gap-2 border-b px-4 md:hidden shrink-0"

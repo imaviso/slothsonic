@@ -1,10 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import {
 	ChevronDown,
+	ChevronUp,
 	Disc3,
 	FileText,
 	ListMusic,
 	Loader2,
+	Maximize2,
 	Music,
 	Pause,
 	Play,
@@ -32,6 +34,7 @@ import {
 	DrawerTitle,
 	DrawerTrigger,
 } from "@/components/ui/drawer";
+import { useSidebar } from "@/components/ui/sidebar";
 import { Slider } from "@/components/ui/slider";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { Song } from "@/lib/api";
@@ -97,6 +100,7 @@ export function Player() {
 	} = usePlayer();
 
 	const isMobile = useIsMobile();
+	const { state: sidebarState } = useSidebar();
 	const [coverUrl, setCoverUrl] = useState<string | null>(null);
 	const [largeCoverUrl, setLargeCoverUrl] = useState<string | null>(null);
 	const [coverLoaded, setCoverLoaded] = useState(false);
@@ -110,22 +114,40 @@ export function Player() {
 	const [mobileTab, setMobileTab] = useState<"player" | "queue" | "lyrics">(
 		"player",
 	);
+	const [isExpanded, setIsExpanded] = useState(false);
+	const [expandedTab, setExpandedTab] = useState<"queue" | "lyrics">("queue");
 
 	const volumeControlRef = useRef<HTMLDivElement>(null);
+	const volumeControlExpandedRef = useRef<HTMLDivElement>(null);
 
 	// Handle wheel events for volume control with non-passive listener
 	useEffect(() => {
-		const element = volumeControlRef.current;
-		if (!element) return;
-
 		const handleWheel = (e: WheelEvent) => {
 			e.preventDefault();
 			const delta = e.deltaY > 0 ? -0.05 : 0.05;
 			setVolume(Math.max(0, Math.min(1, volume + delta)));
 		};
 
-		element.addEventListener("wheel", handleWheel, { passive: false });
-		return () => element.removeEventListener("wheel", handleWheel);
+		const element = volumeControlRef.current;
+		const expandedElement = volumeControlExpandedRef.current;
+
+		if (element) {
+			element.addEventListener("wheel", handleWheel, { passive: false });
+		}
+		if (expandedElement) {
+			expandedElement.addEventListener("wheel", handleWheel, {
+				passive: false,
+			});
+		}
+
+		return () => {
+			if (element) {
+				element.removeEventListener("wheel", handleWheel);
+			}
+			if (expandedElement) {
+				expandedElement.removeEventListener("wheel", handleWheel);
+			}
+		};
 	}, [volume, setVolume]);
 
 	useEffect(() => {
@@ -561,212 +583,578 @@ export function Player() {
 		</Drawer>
 	);
 
-	// Desktop player
-	const desktopPlayer = (
+	// Expanded desktop player content
+	const expandedDesktopPlayer = (
 		<div
-			className="border-t bg-card px-4 h-20 flex items-center gap-4"
-			style={{ viewTransitionName: "player" }}
+			className={cn(
+				"fixed top-0 right-0 bottom-0 bg-card flex flex-col z-50 transition-all duration-300 ease-out",
+				sidebarState === "collapsed"
+					? "left-[var(--sidebar-width-icon)]"
+					: "left-[var(--sidebar-width)]",
+				isExpanded
+					? "opacity-100 translate-y-0 pointer-events-auto"
+					: "opacity-0 translate-y-full pointer-events-none",
+			)}
 		>
-			{/* Track info */}
-			<div className="flex items-center gap-3 w-48 shrink-0 min-w-0 lg:w-auto lg:flex-1 lg:basis-0">
-				<Link
-					to={currentTrack.albumId ? "/app/albums/$albumId" : "/"}
-					params={currentTrack.albumId ? { albumId: currentTrack.albumId } : {}}
-					className="w-14 h-14 rounded-md overflow-hidden bg-muted flex-shrink-0 block hover:opacity-80 transition-opacity"
-				>
-					{coverUrl ? (
-						<img
-							src={coverUrl}
-							alt={currentTrack.title}
-							className={cn(
-								"w-full h-full object-cover transition-opacity duration-200",
-								coverLoaded ? "opacity-100" : "opacity-0",
-							)}
-							onLoad={() => setCoverLoaded(true)}
-						/>
-					) : (
-						<div className="w-full h-full flex items-center justify-center">
-							<Disc3 className="w-6 h-6 text-muted-foreground" />
-						</div>
-					)}
-				</Link>
-				<div className="min-w-0 flex-1">
+			{/* Main content area */}
+			<div className="flex-1 flex overflow-hidden">
+				{/* Left side - Album art and controls */}
+				<div className="flex-1 flex flex-col items-center justify-center p-8 min-w-0 relative">
+					{/* Header with collapse button */}
+					<div className="absolute top-4 left-4">
+						<Button
+							variant="ghost"
+							size="icon"
+							className="w-10 h-10"
+							onClick={() => setIsExpanded(false)}
+							title="Collapse player"
+						>
+							<ChevronDown className="w-6 h-6" />
+						</Button>
+					</div>
+
+					{/* Large album art */}
 					<Link
 						to={currentTrack.albumId ? "/app/albums/$albumId" : "/"}
 						params={
 							currentTrack.albumId ? { albumId: currentTrack.albumId } : {}
 						}
-						className="font-medium text-sm text-foreground truncate hover:text-primary transition-colors block"
+						className="w-full max-w-sm aspect-square rounded-xl overflow-hidden bg-muted shadow-2xl mb-6 block hover:opacity-90 transition-opacity"
 					>
-						{currentTrack.title}
+						{largeCoverUrl ? (
+							<img
+								src={largeCoverUrl}
+								alt={currentTrack.title}
+								className={cn(
+									"w-full h-full object-cover transition-opacity duration-300",
+									largeCoverLoaded ? "opacity-100" : "opacity-0",
+								)}
+								onLoad={() => setLargeCoverLoaded(true)}
+							/>
+						) : (
+							<div className="w-full h-full flex items-center justify-center">
+								<Disc3 className="w-24 h-24 text-muted-foreground" />
+							</div>
+						)}
 					</Link>
-					<Link
-						to={currentTrack.artistId ? "/app/artists/$artistId" : "/"}
-						params={
-							currentTrack.artistId ? { artistId: currentTrack.artistId } : {}
-						}
-						className="text-xs text-muted-foreground truncate hover:text-primary transition-colors block"
-					>
-						{currentTrack.artist}
-					</Link>
-				</div>
-			</div>
 
-			{/* Player controls */}
-			<div className="flex flex-col items-center gap-1 flex-1 min-w-0 max-w-md lg:max-w-xl">
-				<div className="flex items-center gap-2">
-					<Button
-						variant="ghost"
-						size="icon"
-						className={cn("w-8 h-8", shuffle && "text-primary")}
-						onClick={toggleShuffle}
-						title="Shuffle"
-					>
-						<Shuffle className="w-4 h-4" />
-					</Button>
-					<Button
-						variant="ghost"
-						size="icon"
-						className="w-8 h-8"
-						onClick={playPrevious}
-					>
-						<SkipBack className="w-4 h-4" />
-					</Button>
-					<Button
-						variant="default"
-						size="icon"
-						className="w-10 h-10 rounded-full"
-						onClick={togglePlayPause}
-						disabled={isLoading}
-					>
-						{isLoading ? (
-							<Loader2 className="w-5 h-5 animate-spin" />
-						) : isPlaying ? (
-							<Pause className="w-5 h-5" />
-						) : (
-							<Play className="w-5 h-5 ml-0.5" />
-						)}
-					</Button>
-					<Button
-						variant="ghost"
-						size="icon"
-						className="w-8 h-8"
-						onClick={playNext}
-					>
-						<SkipForward className="w-4 h-4" />
-					</Button>
-					<Button
-						variant="ghost"
-						size="icon"
-						className={cn("w-8 h-8", repeat !== "off" && "text-primary")}
-						onClick={toggleRepeat}
-						title={
-							repeat === "off"
-								? "Repeat off"
-								: repeat === "all"
-									? "Repeat all"
-									: "Repeat one"
-						}
-					>
-						{repeat === "one" ? (
-							<Repeat1 className="w-4 h-4" />
-						) : (
-							<Repeat className="w-4 h-4" />
-						)}
-					</Button>
+					{/* Track info */}
+					<div className="text-center mb-6 max-w-sm w-full">
+						<Link
+							to={currentTrack.albumId ? "/app/albums/$albumId" : "/"}
+							params={
+								currentTrack.albumId ? { albumId: currentTrack.albumId } : {}
+							}
+							className="font-bold text-xl text-foreground hover:text-primary transition-colors line-clamp-1 block"
+						>
+							{currentTrack.title}
+						</Link>
+						<Link
+							to={currentTrack.artistId ? "/app/artists/$artistId" : "/"}
+							params={
+								currentTrack.artistId ? { artistId: currentTrack.artistId } : {}
+							}
+							className="text-base text-muted-foreground hover:text-primary transition-colors block mt-1"
+						>
+							{currentTrack.artist}
+						</Link>
+					</div>
+
+					{/* Progress bar */}
+					<div className="w-full max-w-sm space-y-2 mb-6">
+						<Slider
+							value={[isSeeking ? seekValue : currentTime]}
+							min={0}
+							max={duration || 100}
+							step={1}
+							onValueChange={handleSeekChange}
+							onValueCommit={handleSeekEnd}
+							className={cn(!duration && "opacity-50")}
+							disabled={!duration}
+						/>
+						<div className="flex justify-between text-sm text-muted-foreground">
+							<span>{formatTime(isSeeking ? seekValue : currentTime)}</span>
+							<span>{formatTime(duration)}</span>
+						</div>
+					</div>
+
+					{/* Main controls */}
+					<div className="flex items-center justify-center gap-4 mb-6">
+						<Button
+							variant="ghost"
+							size="icon"
+							className={cn("w-10 h-10", shuffle && "text-primary")}
+							onClick={toggleShuffle}
+							title="Shuffle"
+						>
+							<Shuffle className="w-5 h-5" />
+						</Button>
+						<Button
+							variant="ghost"
+							size="icon"
+							className="w-12 h-12"
+							onClick={playPrevious}
+						>
+							<SkipBack className="w-7 h-7" />
+						</Button>
+						<Button
+							variant="default"
+							size="icon"
+							className="w-16 h-16 rounded-full"
+							onClick={togglePlayPause}
+							disabled={isLoading}
+						>
+							{isLoading ? (
+								<Loader2 className="w-8 h-8 animate-spin" />
+							) : isPlaying ? (
+								<Pause className="w-8 h-8" />
+							) : (
+								<Play className="w-8 h-8 ml-1" />
+							)}
+						</Button>
+						<Button
+							variant="ghost"
+							size="icon"
+							className="w-12 h-12"
+							onClick={playNext}
+						>
+							<SkipForward className="w-7 h-7" />
+						</Button>
+						<Button
+							variant="ghost"
+							size="icon"
+							className={cn("w-10 h-10", repeat !== "off" && "text-primary")}
+							onClick={toggleRepeat}
+							title={
+								repeat === "off"
+									? "Repeat off"
+									: repeat === "all"
+										? "Repeat all"
+										: "Repeat one"
+							}
+						>
+							{repeat === "one" ? (
+								<Repeat1 className="w-5 h-5" />
+							) : (
+								<Repeat className="w-5 h-5" />
+							)}
+						</Button>
+					</div>
+
+					{/* Secondary controls */}
+					<div className="flex items-center justify-center gap-3">
+						<StarButton
+							id={currentTrack.id}
+							type="song"
+							isStarred={!!currentTrack.starred}
+							size="lg"
+						/>
+						<AddToPlaylistButton
+							songId={currentTrack.id}
+							song={{
+								id: currentTrack.id,
+								title: currentTrack.title,
+								artist: currentTrack.artist,
+								album: currentTrack.album,
+								albumId: currentTrack.albumId,
+								duration: currentTrack.duration,
+								coverArt: currentTrack.coverArt,
+							}}
+							size="default"
+							dropdownPosition="top"
+						/>
+						<div
+							ref={volumeControlExpandedRef}
+							className="flex items-center gap-2 ml-2"
+						>
+							<Button
+								variant="ghost"
+								size="icon"
+								className="w-9 h-9"
+								onClick={toggleMute}
+							>
+								{volume === 0 ? (
+									<VolumeX className="w-5 h-5" />
+								) : (
+									<Volume2 className="w-5 h-5" />
+								)}
+							</Button>
+							<Slider
+								value={[volume]}
+								min={0}
+								max={1}
+								step={0.01}
+								onValueChange={(value) => setVolume(value[0])}
+								className="w-28"
+							/>
+						</div>
+					</div>
 				</div>
 
-				{/* Progress bar */}
-				<div className="w-full flex items-center gap-2">
-					<span className="text-xs text-muted-foreground w-10 text-right">
-						{formatTime(isSeeking ? seekValue : currentTime)}
-					</span>
-					<Slider
-						value={[isSeeking ? seekValue : currentTime]}
-						min={0}
-						max={duration || 100}
-						step={1}
-						onValueChange={handleSeekChange}
-						onValueCommit={handleSeekEnd}
-						className={cn("flex-1", !duration && "opacity-50")}
-						disabled={!duration}
-					/>
-					<span className="text-xs text-muted-foreground w-10">
-						{formatTime(duration)}
-					</span>
-				</div>
-			</div>
+				{/* Right side - Tabbed Queue/Lyrics panel */}
+				<div className="w-96 border-l flex flex-col shrink-0 bg-background/50">
+					{/* Tab header */}
+					<div className="flex items-center border-b shrink-0">
+						<button
+							type="button"
+							onClick={() => setExpandedTab("queue")}
+							className={cn(
+								"flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors",
+								expandedTab === "queue"
+									? "text-primary border-b-2 border-primary bg-muted/30"
+									: "text-muted-foreground hover:text-foreground hover:bg-muted/20",
+							)}
+						>
+							<ListMusic className="w-4 h-4" />
+							Queue ({queue.length})
+						</button>
+						<button
+							type="button"
+							onClick={() => setExpandedTab("lyrics")}
+							className={cn(
+								"flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors",
+								expandedTab === "lyrics"
+									? "text-primary border-b-2 border-primary bg-muted/30"
+									: "text-muted-foreground hover:text-foreground hover:bg-muted/20",
+							)}
+						>
+							<FileText className="w-4 h-4" />
+							Lyrics
+						</button>
+					</div>
 
-			{/* Right side controls */}
-			<div className="flex items-center justify-end gap-2 shrink-0 lg:flex-1 lg:basis-0">
-				<StarButton
-					id={currentTrack.id}
-					type="song"
-					isStarred={!!currentTrack.starred}
-					size="sm"
-				/>
-				<AddToPlaylistButton
-					songId={currentTrack.id}
-					song={{
-						id: currentTrack.id,
-						title: currentTrack.title,
-						artist: currentTrack.artist,
-						album: currentTrack.album,
-						albumId: currentTrack.albumId,
-						duration: currentTrack.duration,
-						coverArt: currentTrack.coverArt,
-					}}
-					size="sm"
-					dropdownPosition="top"
-				/>
-				<Button
-					variant="ghost"
-					size="icon"
-					className={cn("w-8 h-8", showLyrics && "text-primary")}
-					onClick={() => {
-						setShowQueue(false);
-						setShowLyrics(!showLyrics);
-					}}
-					title="View lyrics"
-				>
-					<FileText className="w-4 h-4" />
-				</Button>
-				<Button
-					variant="ghost"
-					size="icon"
-					className={cn("w-8 h-8", showQueue && "text-primary")}
-					onClick={() => {
-						setShowLyrics(false);
-						setShowQueue(!showQueue);
-					}}
-					title="View queue"
-				>
-					<ListMusic className="w-4 h-4" />
-				</Button>
-				<div ref={volumeControlRef} className="flex items-center gap-1">
-					<Button
-						variant="ghost"
-						size="icon"
-						className="w-8 h-8"
-						onClick={toggleMute}
-					>
-						{volume === 0 ? (
-							<VolumeX className="w-4 h-4" />
-						) : (
-							<Volume2 className="w-4 h-4" />
+					{/* Tab content */}
+					<div className="flex-1 overflow-hidden">
+						{expandedTab === "queue" && (
+							<div className="flex flex-col h-full">
+								{queue.length > 1 && (
+									<div className="flex items-center justify-end px-4 py-2 border-b">
+										<Button
+											variant="ghost"
+											size="sm"
+											className="h-8 text-xs text-muted-foreground hover:text-foreground"
+											onClick={() => {
+												const previousState = clearQueue();
+												if (
+													previousState &&
+													previousState.previousQueue.length > 1
+												) {
+													toast.success("Queue cleared", {
+														action: {
+															label: "Undo",
+															onClick: () => {
+																restoreQueueState(previousState);
+																toast.success("Queue restored");
+															},
+														},
+													});
+												}
+											}}
+										>
+											<Trash2 className="w-3.5 h-3.5 mr-1.5" />
+											Clear
+										</Button>
+									</div>
+								)}
+								<div className="overflow-y-auto flex-1 scrollbar-thin">
+									{queue.length === 0 ? (
+										<div className="p-8 text-center text-sm text-muted-foreground">
+											Queue is empty
+										</div>
+									) : (
+										<div className="divide-y">
+											{queue.map((song, index) => (
+												<QueueContextMenu
+													key={`${song.id}-${index}`}
+													song={song}
+													index={index}
+													isCurrentTrack={index === queueIndex}
+													onRemove={() => removeFromQueue(index)}
+												>
+													<button
+														type="button"
+														onClick={() => playSong(song, queue, index)}
+														className={cn(
+															"w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors text-left",
+															index === queueIndex && "bg-primary/10",
+														)}
+													>
+														<span
+															className={cn(
+																"w-5 text-xs text-muted-foreground text-center",
+																index === queueIndex &&
+																	"text-primary font-medium",
+															)}
+														>
+															{index + 1}
+														</span>
+														<QueueItemCover song={song} />
+														<div className="min-w-0 flex-1">
+															<p
+																className={cn(
+																	"text-sm truncate",
+																	index === queueIndex
+																		? "text-primary font-medium"
+																		: "text-foreground",
+																)}
+															>
+																{song.title}
+															</p>
+															<p className="text-xs text-muted-foreground truncate">
+																{song.artist}
+															</p>
+														</div>
+													</button>
+												</QueueContextMenu>
+											))}
+										</div>
+									)}
+								</div>
+							</div>
 						)}
-					</Button>
-					<Slider
-						value={[volume]}
-						min={0}
-						max={1}
-						step={0.01}
-						onValueChange={(value) => setVolume(value[0])}
-						className="w-24"
-					/>
+
+						{expandedTab === "lyrics" && (
+							<LyricsPanel
+								songTitle={currentTrack.title}
+								songArtist={currentTrack.artist ?? ""}
+								onClose={() => setExpandedTab("queue")}
+								showHeader={false}
+							/>
+						)}
+					</div>
 				</div>
 			</div>
 		</div>
+	);
+
+	// Desktop player - always render both, animate expanded
+	const desktopPlayer = (
+		<>
+			{/* Collapsed player bar - hide when expanded */}
+			<div
+				className={cn(
+					"border-t bg-card px-4 h-20 flex items-center gap-4 transition-all duration-300",
+					isExpanded && "opacity-0 pointer-events-none",
+				)}
+				style={{ viewTransitionName: "player" }}
+			>
+				{/* Track info */}
+				<div className="flex items-center gap-3 w-48 shrink-0 min-w-0 lg:w-auto lg:flex-1 lg:basis-0">
+					<button
+						type="button"
+						onClick={() => setIsExpanded(true)}
+						className="w-14 h-14 rounded-md overflow-hidden bg-muted flex-shrink-0 block hover:opacity-80 transition-opacity relative group"
+						title="Expand player"
+					>
+						{coverUrl ? (
+							<img
+								src={coverUrl}
+								alt={currentTrack.title}
+								className={cn(
+									"w-full h-full object-cover transition-opacity duration-200",
+									coverLoaded ? "opacity-100" : "opacity-0",
+								)}
+								onLoad={() => setCoverLoaded(true)}
+							/>
+						) : (
+							<div className="w-full h-full flex items-center justify-center">
+								<Disc3 className="w-6 h-6 text-muted-foreground" />
+							</div>
+						)}
+						<div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+							<ChevronUp className="w-6 h-6 text-white" />
+						</div>
+					</button>
+					<div className="min-w-0 flex-1">
+						<Link
+							to={currentTrack.albumId ? "/app/albums/$albumId" : "/"}
+							params={
+								currentTrack.albumId ? { albumId: currentTrack.albumId } : {}
+							}
+							className="font-medium text-sm text-foreground truncate hover:text-primary transition-colors block"
+						>
+							{currentTrack.title}
+						</Link>
+						<Link
+							to={currentTrack.artistId ? "/app/artists/$artistId" : "/"}
+							params={
+								currentTrack.artistId ? { artistId: currentTrack.artistId } : {}
+							}
+							className="text-xs text-muted-foreground truncate hover:text-primary transition-colors block"
+						>
+							{currentTrack.artist}
+						</Link>
+					</div>
+				</div>
+
+				{/* Player controls */}
+				<div className="flex flex-col items-center gap-1 flex-1 min-w-0 max-w-md lg:max-w-xl">
+					<div className="flex items-center gap-2">
+						<Button
+							variant="ghost"
+							size="icon"
+							className={cn("w-8 h-8", shuffle && "text-primary")}
+							onClick={toggleShuffle}
+							title="Shuffle"
+						>
+							<Shuffle className="w-4 h-4" />
+						</Button>
+						<Button
+							variant="ghost"
+							size="icon"
+							className="w-8 h-8"
+							onClick={playPrevious}
+						>
+							<SkipBack className="w-4 h-4" />
+						</Button>
+						<Button
+							variant="default"
+							size="icon"
+							className="w-10 h-10 rounded-full"
+							onClick={togglePlayPause}
+							disabled={isLoading}
+						>
+							{isLoading ? (
+								<Loader2 className="w-5 h-5 animate-spin" />
+							) : isPlaying ? (
+								<Pause className="w-5 h-5" />
+							) : (
+								<Play className="w-5 h-5 ml-0.5" />
+							)}
+						</Button>
+						<Button
+							variant="ghost"
+							size="icon"
+							className="w-8 h-8"
+							onClick={playNext}
+						>
+							<SkipForward className="w-4 h-4" />
+						</Button>
+						<Button
+							variant="ghost"
+							size="icon"
+							className={cn("w-8 h-8", repeat !== "off" && "text-primary")}
+							onClick={toggleRepeat}
+							title={
+								repeat === "off"
+									? "Repeat off"
+									: repeat === "all"
+										? "Repeat all"
+										: "Repeat one"
+							}
+						>
+							{repeat === "one" ? (
+								<Repeat1 className="w-4 h-4" />
+							) : (
+								<Repeat className="w-4 h-4" />
+							)}
+						</Button>
+					</div>
+
+					{/* Progress bar */}
+					<div className="w-full flex items-center gap-2">
+						<span className="text-xs text-muted-foreground w-10 text-right">
+							{formatTime(isSeeking ? seekValue : currentTime)}
+						</span>
+						<Slider
+							value={[isSeeking ? seekValue : currentTime]}
+							min={0}
+							max={duration || 100}
+							step={1}
+							onValueChange={handleSeekChange}
+							onValueCommit={handleSeekEnd}
+							className={cn("flex-1", !duration && "opacity-50")}
+							disabled={!duration}
+						/>
+						<span className="text-xs text-muted-foreground w-10">
+							{formatTime(duration)}
+						</span>
+					</div>
+				</div>
+
+				{/* Right side controls */}
+				<div className="flex items-center justify-end gap-2 shrink-0 lg:flex-1 lg:basis-0">
+					<StarButton
+						id={currentTrack.id}
+						type="song"
+						isStarred={!!currentTrack.starred}
+						size="sm"
+					/>
+					<AddToPlaylistButton
+						songId={currentTrack.id}
+						song={{
+							id: currentTrack.id,
+							title: currentTrack.title,
+							artist: currentTrack.artist,
+							album: currentTrack.album,
+							albumId: currentTrack.albumId,
+							duration: currentTrack.duration,
+							coverArt: currentTrack.coverArt,
+						}}
+						size="sm"
+						dropdownPosition="top"
+					/>
+					<Button
+						variant="ghost"
+						size="icon"
+						className={cn("w-8 h-8", showLyrics && "text-primary")}
+						onClick={() => {
+							setShowQueue(false);
+							setShowLyrics(!showLyrics);
+						}}
+						title="View lyrics"
+					>
+						<FileText className="w-4 h-4" />
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon"
+						className={cn("w-8 h-8", showQueue && "text-primary")}
+						onClick={() => {
+							setShowLyrics(false);
+							setShowQueue(!showQueue);
+						}}
+						title="View queue"
+					>
+						<ListMusic className="w-4 h-4" />
+					</Button>
+					<div ref={volumeControlRef} className="flex items-center gap-1">
+						<Button
+							variant="ghost"
+							size="icon"
+							className="w-8 h-8"
+							onClick={toggleMute}
+						>
+							{volume === 0 ? (
+								<VolumeX className="w-4 h-4" />
+							) : (
+								<Volume2 className="w-4 h-4" />
+							)}
+						</Button>
+						<Slider
+							value={[volume]}
+							min={0}
+							max={1}
+							step={0.01}
+							onValueChange={(value) => setVolume(value[0])}
+							className="w-24"
+						/>
+					</div>
+					<Button
+						variant="ghost"
+						size="icon"
+						className="w-8 h-8"
+						onClick={() => setIsExpanded(true)}
+						title="Expand player"
+					>
+						<Maximize2 className="w-4 h-4" />
+					</Button>
+				</div>
+			</div>
+
+			{/* Expanded player overlay */}
+			{expandedDesktopPlayer}
+		</>
 	);
 
 	// Desktop drawers for queue and lyrics
@@ -896,7 +1284,7 @@ export function Player() {
 	) : (
 		<>
 			{desktopPlayer}
-			{desktopDrawers}
+			{!isExpanded && desktopDrawers}
 		</>
 	);
 }
