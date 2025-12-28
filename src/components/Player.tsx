@@ -36,9 +36,15 @@ import {
 } from "@/components/ui/drawer";
 import { useSidebar } from "@/components/ui/sidebar";
 import { Slider } from "@/components/ui/slider";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { Song } from "@/lib/api";
 import { getTrackCoverUrl, restoreQueueState, usePlayer } from "@/lib/player";
+import { useSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
 function formatTime(seconds: number): string {
@@ -46,6 +52,70 @@ function formatTime(seconds: number): string {
 	const mins = Math.floor(seconds / 60);
 	const secs = Math.floor(seconds % 60);
 	return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+// Extract dominant color from an image URL
+function extractDominantColor(
+	imageUrl: string,
+): Promise<{ r: number; g: number; b: number } | null> {
+	return new Promise((resolve) => {
+		const img = new Image();
+		img.crossOrigin = "anonymous";
+		img.onload = () => {
+			try {
+				const canvas = document.createElement("canvas");
+				const ctx = canvas.getContext("2d");
+				if (!ctx) {
+					resolve(null);
+					return;
+				}
+
+				// Sample a small version for performance
+				const size = 50;
+				canvas.width = size;
+				canvas.height = size;
+				ctx.drawImage(img, 0, 0, size, size);
+
+				const imageData = ctx.getImageData(0, 0, size, size);
+				const data = imageData.data;
+
+				let r = 0,
+					g = 0,
+					b = 0,
+					count = 0;
+
+				// Sample pixels, skipping very dark and very light ones
+				for (let i = 0; i < data.length; i += 4) {
+					const pr = data[i];
+					const pg = data[i + 1];
+					const pb = data[i + 2];
+					const brightness = (pr + pg + pb) / 3;
+
+					// Skip very dark or very light pixels
+					if (brightness > 30 && brightness < 220) {
+						r += pr;
+						g += pg;
+						b += pb;
+						count++;
+					}
+				}
+
+				if (count > 0) {
+					resolve({
+						r: Math.round(r / count),
+						g: Math.round(g / count),
+						b: Math.round(b / count),
+					});
+				} else {
+					resolve(null);
+				}
+			} catch {
+				resolve(null);
+			}
+		};
+		img.onerror = () => resolve(null);
+		img.src = imageUrl;
+	});
 }
 
 // Queue item cover art component
@@ -99,6 +169,7 @@ export function Player() {
 		toggleRepeat,
 	} = usePlayer();
 
+	const { settings } = useSettings();
 	const isMobile = useIsMobile();
 	const { state: sidebarState } = useSidebar();
 	const [coverUrl, setCoverUrl] = useState<string | null>(null);
@@ -116,6 +187,11 @@ export function Player() {
 	);
 	const [isExpanded, setIsExpanded] = useState(false);
 	const [expandedTab, setExpandedTab] = useState<"queue" | "lyrics">("queue");
+	const [dominantColor, setDominantColor] = useState<{
+		r: number;
+		g: number;
+		b: number;
+	} | null>(null);
 
 	const volumeControlRef = useRef<HTMLDivElement>(null);
 	const volumeControlExpandedRef = useRef<HTMLDivElement>(null);
@@ -161,6 +237,15 @@ export function Player() {
 			setLargeCoverUrl(null);
 		}
 	}, [currentTrack?.coverArt]);
+
+	// Extract dominant color from album art for dynamic background
+	useEffect(() => {
+		if (settings.dynamicPlayerBackground && largeCoverUrl) {
+			extractDominantColor(largeCoverUrl).then(setDominantColor);
+		} else {
+			setDominantColor(null);
+		}
+	}, [largeCoverUrl, settings.dynamicPlayerBackground]);
 
 	// Close expanded player on route change or navigation click
 	const location = useLocation();
@@ -233,6 +318,21 @@ export function Player() {
 			setVolume(prevVolume);
 		}
 	};
+
+	// Dynamic background style for expanded player
+	const dynamicBackgroundStyle: React.CSSProperties | undefined =
+		settings.dynamicPlayerBackground && dominantColor
+			? {
+					backgroundColor: `rgb(${dominantColor.r}, ${dominantColor.g}, ${dominantColor.b})`,
+					backgroundImage: `
+						radial-gradient(ellipse at 20% 20%, rgba(${dominantColor.r}, ${dominantColor.g}, ${dominantColor.b}, 0.8) 0%, transparent 50%),
+						radial-gradient(ellipse at 80% 80%, rgba(${dominantColor.r}, ${dominantColor.g}, ${dominantColor.b}, 0.6) 0%, transparent 50%),
+						linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0%, rgba(0, 0, 0, 0.6) 100%)
+					`,
+					backdropFilter: "blur(80px)",
+					WebkitBackdropFilter: "blur(80px)",
+				}
+			: undefined;
 
 	// Queue panel content (shared between desktop and mobile)
 	const queueContent = (
@@ -334,7 +434,10 @@ export function Player() {
 
 	// Mobile expanded player content
 	const mobileExpandedPlayer = (
-		<div className="flex flex-col h-full bg-background">
+		<div
+			className="flex flex-col h-full bg-background"
+			style={dynamicBackgroundStyle}
+		>
 			{/* Header with close button */}
 			<div className="flex items-center justify-between p-4">
 				<Button
@@ -432,6 +535,61 @@ export function Player() {
 						>
 							{currentTrack.artist}
 						</Link>
+						{currentTrack.album && (
+							<Link
+								to={currentTrack.albumId ? "/app/albums/$albumId" : "/"}
+								params={
+									currentTrack.albumId ? { albumId: currentTrack.albumId } : {}
+								}
+								onClick={() => setDrawerOpen(false)}
+								className="text-sm text-muted-foreground hover:text-primary transition-colors block"
+							>
+								{currentTrack.album}
+							</Link>
+						)}
+						{/* Additional song details */}
+						<div className="flex items-center justify-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
+							{currentTrack.year && <span>{currentTrack.year}</span>}
+							{currentTrack.year && currentTrack.genre && (
+								<span className="text-muted-foreground/50">•</span>
+							)}
+							{currentTrack.genre && (
+								<Link
+									to="/app/genres/$genreName"
+									params={{ genreName: currentTrack.genre }}
+									onClick={() => setDrawerOpen(false)}
+									className="hover:text-primary transition-colors"
+								>
+									{currentTrack.genre}
+								</Link>
+							)}
+							{(currentTrack.year || currentTrack.genre) &&
+								currentTrack.track && (
+									<span className="text-muted-foreground/50">•</span>
+								)}
+							{currentTrack.track && <span>Track {currentTrack.track}</span>}
+						</div>
+						{/* Technical details */}
+						<div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/70">
+							{currentTrack.suffix && (
+								<span className="uppercase">{currentTrack.suffix}</span>
+							)}
+							{currentTrack.suffix && currentTrack.bitRate && (
+								<span className="text-muted-foreground/50">•</span>
+							)}
+							{currentTrack.bitRate && <span>{currentTrack.bitRate} kbps</span>}
+							{(currentTrack.suffix || currentTrack.bitRate) &&
+								currentTrack.size && (
+									<span className="text-muted-foreground/50">•</span>
+								)}
+							{currentTrack.size && (
+								<span>
+									{currentTrack.size >= 1048576
+										? `${(currentTrack.size / 1048576).toFixed(1)} MB`
+										: `${Math.round(currentTrack.size / 1024)} KB`}
+								</span>
+							)}
+						</div>
 					</div>
 
 					{/* Progress bar */}
@@ -644,13 +802,14 @@ export function Player() {
 					? "opacity-100 translate-y-0 pointer-events-auto"
 					: "opacity-0 translate-y-full pointer-events-none",
 			)}
+			style={dynamicBackgroundStyle}
 		>
 			{/* Main content area */}
 			<div className="flex-1 flex overflow-hidden">
 				{/* Left side - Album art and controls */}
 				<div className="flex-1 flex flex-col items-center justify-center p-8 min-w-0 relative">
-					{/* Header with collapse button */}
-					<div className="absolute top-4 left-4">
+					{/* Header with collapse button and tab switcher */}
+					<div className="absolute top-4 left-4 right-4 flex items-center">
 						<Button
 							variant="ghost"
 							size="icon"
@@ -660,6 +819,29 @@ export function Player() {
 						>
 							<ChevronDown className="w-6 h-6" />
 						</Button>
+						{/* Tab switcher for Queue/Lyrics - centered */}
+						<div className="flex-1 flex items-center justify-center gap-1">
+							<Button
+								variant={expandedTab === "queue" ? "secondary" : "ghost"}
+								size="sm"
+								onClick={() => setExpandedTab("queue")}
+								className="gap-1.5"
+							>
+								<ListMusic className="w-4 h-4" />
+								Queue ({queue.length})
+							</Button>
+							<Button
+								variant={expandedTab === "lyrics" ? "secondary" : "ghost"}
+								size="sm"
+								onClick={() => setExpandedTab("lyrics")}
+								className="gap-1.5"
+							>
+								<FileText className="w-4 h-4" />
+								Lyrics
+							</Button>
+						</div>
+						{/* Spacer to balance the collapse button */}
+						<div className="w-10" />
 					</div>
 
 					{/* Large album art */}
@@ -707,6 +889,59 @@ export function Player() {
 						>
 							{currentTrack.artist}
 						</Link>
+						{currentTrack.album && (
+							<Link
+								to={currentTrack.albumId ? "/app/albums/$albumId" : "/"}
+								params={
+									currentTrack.albumId ? { albumId: currentTrack.albumId } : {}
+								}
+								className="text-sm text-muted-foreground hover:text-primary transition-colors block mt-1"
+							>
+								{currentTrack.album}
+							</Link>
+						)}
+						{/* Additional song details */}
+						<div className="flex items-center justify-center gap-2 mt-2 text-xs text-muted-foreground flex-wrap">
+							{currentTrack.year && <span>{currentTrack.year}</span>}
+							{currentTrack.year && currentTrack.genre && (
+								<span className="text-muted-foreground/50">•</span>
+							)}
+							{currentTrack.genre && (
+								<Link
+									to="/app/genres/$genreName"
+									params={{ genreName: currentTrack.genre }}
+									className="hover:text-primary transition-colors"
+								>
+									{currentTrack.genre}
+								</Link>
+							)}
+							{(currentTrack.year || currentTrack.genre) &&
+								currentTrack.track && (
+									<span className="text-muted-foreground/50">•</span>
+								)}
+							{currentTrack.track && <span>Track {currentTrack.track}</span>}
+						</div>
+						{/* Technical details */}
+						<div className="flex items-center justify-center gap-2 mt-1 text-xs text-muted-foreground/70">
+							{currentTrack.suffix && (
+								<span className="uppercase">{currentTrack.suffix}</span>
+							)}
+							{currentTrack.suffix && currentTrack.bitRate && (
+								<span className="text-muted-foreground/50">•</span>
+							)}
+							{currentTrack.bitRate && <span>{currentTrack.bitRate} kbps</span>}
+							{(currentTrack.suffix || currentTrack.bitRate) &&
+								currentTrack.size && (
+									<span className="text-muted-foreground/50">•</span>
+								)}
+							{currentTrack.size && (
+								<span>
+									{currentTrack.size >= 1048576
+										? `${(currentTrack.size / 1048576).toFixed(1)} MB`
+										: `${Math.round(currentTrack.size / 1024)} KB`}
+								</span>
+							)}
+						</div>
 					</div>
 
 					{/* Progress bar */}
@@ -840,140 +1075,109 @@ export function Player() {
 					</div>
 				</div>
 
-				{/* Right side - Tabbed Queue/Lyrics panel */}
+				{/* Right side - Queue/Lyrics panel (full height) */}
 				<div className="w-[28rem] border-l flex flex-col shrink-0 bg-background/50">
-					{/* Tab header */}
-					<div className="flex items-center border-b shrink-0">
-						<button
-							type="button"
-							onClick={() => setExpandedTab("queue")}
-							className={cn(
-								"flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors",
-								expandedTab === "queue"
-									? "text-primary border-b-2 border-primary bg-muted/30"
-									: "text-muted-foreground hover:text-foreground hover:bg-muted/20",
-							)}
-						>
-							<ListMusic className="w-4 h-4" />
-							Queue ({queue.length})
-						</button>
-						<button
-							type="button"
-							onClick={() => setExpandedTab("lyrics")}
-							className={cn(
-								"flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors",
-								expandedTab === "lyrics"
-									? "text-primary border-b-2 border-primary bg-muted/30"
-									: "text-muted-foreground hover:text-foreground hover:bg-muted/20",
-							)}
-						>
-							<FileText className="w-4 h-4" />
-							Lyrics
-						</button>
-					</div>
-
-					{/* Tab content */}
-					<div className="flex-1 overflow-hidden">
-						{expandedTab === "queue" && (
-							<div className="flex flex-col h-full">
+					{expandedTab === "queue" && (
+						<div className="flex flex-col h-full">
+							{/* Queue header */}
+							<div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
+								<h3 className="font-semibold">Queue</h3>
 								{queue.length > 1 && (
-									<div className="flex items-center justify-end px-4 py-2 border-b">
-										<Button
-											variant="ghost"
-											size="sm"
-											className="h-8 text-xs text-muted-foreground hover:text-foreground"
-											onClick={() => {
-												const previousState = clearQueue();
-												if (
-													previousState &&
-													previousState.previousQueue.length > 1
-												) {
-													toast.success("Queue cleared", {
-														action: {
-															label: "Undo",
-															onClick: () => {
-																restoreQueueState(previousState);
-																toast.success("Queue restored");
-															},
+									<Button
+										variant="ghost"
+										size="sm"
+										className="h-8 text-xs text-muted-foreground hover:text-foreground"
+										onClick={() => {
+											const previousState = clearQueue();
+											if (
+												previousState &&
+												previousState.previousQueue.length > 1
+											) {
+												toast.success("Queue cleared", {
+													action: {
+														label: "Undo",
+														onClick: () => {
+															restoreQueueState(previousState);
+															toast.success("Queue restored");
 														},
-													});
-												}
-											}}
-										>
-											<Trash2 className="w-3.5 h-3.5 mr-1.5" />
-											Clear
-										</Button>
-									</div>
+													},
+												});
+											}
+										}}
+									>
+										<Trash2 className="w-3.5 h-3.5 mr-1.5" />
+										Clear
+									</Button>
 								)}
-								<div className="overflow-y-auto flex-1 scrollbar-thin">
-									{queue.length === 0 ? (
-										<div className="p-8 text-center text-sm text-muted-foreground">
-											Queue is empty
-										</div>
-									) : (
-										<div className="divide-y">
-											{queue.map((song, index) => (
-												<QueueContextMenu
-													key={`${song.id}-${index}`}
-													song={song}
-													index={index}
-													isCurrentTrack={index === queueIndex}
-													onRemove={() => removeFromQueue(index)}
+							</div>
+							<div className="overflow-y-auto flex-1 scrollbar-thin">
+								{queue.length === 0 ? (
+									<div className="p-8 text-center text-sm text-muted-foreground">
+										Queue is empty
+									</div>
+								) : (
+									<div className="divide-y">
+										{queue.map((song, index) => (
+											<QueueContextMenu
+												key={`${song.id}-${index}`}
+												song={song}
+												index={index}
+												isCurrentTrack={index === queueIndex}
+												onRemove={() => removeFromQueue(index)}
+											>
+												<button
+													type="button"
+													onClick={() => playSong(song, queue, index)}
+													className={cn(
+														"w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors text-left",
+														index === queueIndex && "bg-primary/10",
+													)}
 												>
-													<button
-														type="button"
-														onClick={() => playSong(song, queue, index)}
+													<span
 														className={cn(
-															"w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors text-left",
-															index === queueIndex && "bg-primary/10",
+															"w-5 text-xs text-muted-foreground text-center",
+															index === queueIndex &&
+																"text-primary font-medium",
 														)}
 													>
-														<span
+														{index + 1}
+													</span>
+													<QueueItemCover song={song} />
+													<div className="min-w-0 flex-1">
+														<p
 															className={cn(
-																"w-5 text-xs text-muted-foreground text-center",
-																index === queueIndex &&
-																	"text-primary font-medium",
+																"text-sm truncate",
+																index === queueIndex
+																	? "text-primary font-medium"
+																	: "text-foreground",
 															)}
 														>
-															{index + 1}
-														</span>
-														<QueueItemCover song={song} />
-														<div className="min-w-0 flex-1">
-															<p
-																className={cn(
-																	"text-sm truncate",
-																	index === queueIndex
-																		? "text-primary font-medium"
-																		: "text-foreground",
-																)}
-															>
-																{song.title}
-															</p>
-															<p className="text-xs text-muted-foreground truncate">
-																{song.artist}
-															</p>
-														</div>
-													</button>
-												</QueueContextMenu>
-											))}
-										</div>
-									)}
-								</div>
+															{song.title}
+														</p>
+														<p className="text-xs text-muted-foreground truncate">
+															{song.artist}
+														</p>
+													</div>
+												</button>
+											</QueueContextMenu>
+										))}
+									</div>
+								)}
 							</div>
-						)}
+						</div>
+					)}
 
-						{expandedTab === "lyrics" && (
-							<LyricsPanel
-								songId={currentTrack.id}
-								songTitle={currentTrack.title}
-								songArtist={currentTrack.artist ?? ""}
-								currentTime={currentTime}
-								onSeek={seek}
-								onClose={() => setExpandedTab("queue")}
-								showHeader={false}
-							/>
-						)}
-					</div>
+					{expandedTab === "lyrics" && (
+						<LyricsPanel
+							songId={currentTrack.id}
+							songTitle={currentTrack.title}
+							songArtist={currentTrack.artist ?? ""}
+							currentTime={currentTime}
+							onSeek={seek}
+							onClose={() => setExpandedTab("queue")}
+							showHeader={true}
+						/>
+					)}
 				</div>
 			</div>
 		</div>
@@ -985,13 +1189,29 @@ export function Player() {
 			{/* Collapsed player bar - hide when expanded */}
 			<div
 				className={cn(
-					"border-t bg-card px-4 h-20 flex items-center gap-4 transition-all duration-300",
+					"border-t bg-card px-4 h-20 flex items-center gap-4 transition-all duration-300 relative",
 					isExpanded && "opacity-0 pointer-events-none",
 				)}
 				style={{ viewTransitionName: "player" }}
 			>
+				{/* Clickable background to expand - covers empty space */}
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<button
+							type="button"
+							onClick={() => setIsExpanded(true)}
+							className="absolute inset-0 z-0"
+							aria-label="Expand player"
+						/>
+					</TooltipTrigger>
+					<TooltipContent side="top" className="flex items-center gap-1.5">
+						<ChevronUp className="w-3.5 h-3.5" />
+						<span>Click to expand player</span>
+					</TooltipContent>
+				</Tooltip>
+
 				{/* Track info */}
-				<div className="flex items-center gap-3 w-48 shrink-0 min-w-0 lg:w-auto lg:flex-1 lg:basis-0">
+				<div className="flex items-center gap-3 w-48 shrink-0 min-w-0 lg:w-auto lg:flex-1 lg:basis-0 relative z-10">
 					<button
 						type="button"
 						onClick={() => setIsExpanded(true)}
@@ -1013,9 +1233,6 @@ export function Player() {
 								<Disc3 className="w-6 h-6 text-muted-foreground" />
 							</div>
 						)}
-						<div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-							<ChevronUp className="w-6 h-6 text-white" />
-						</div>
 					</button>
 					<div className="min-w-0 flex-1">
 						<Link
@@ -1040,7 +1257,7 @@ export function Player() {
 				</div>
 
 				{/* Player controls */}
-				<div className="flex flex-col items-center gap-1 flex-1 min-w-0 max-w-md lg:max-w-xl">
+				<div className="flex flex-col items-center gap-1 flex-1 min-w-0 max-w-md lg:max-w-xl relative z-10">
 					<div className="flex items-center gap-2">
 						<Button
 							variant="ghost"
@@ -1125,7 +1342,7 @@ export function Player() {
 				</div>
 
 				{/* Right side controls */}
-				<div className="flex items-center justify-end gap-2 shrink-0 lg:flex-1 lg:basis-0">
+				<div className="flex items-center justify-end gap-2 shrink-0 lg:flex-1 lg:basis-0 relative z-10">
 					<StarButton
 						id={currentTrack.id}
 						type="song"

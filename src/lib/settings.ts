@@ -9,6 +9,7 @@ export type AudioBackend = "html5" | "mpv";
 export interface Settings {
 	audioBackend: AudioBackend;
 	mpvPath?: string; // Custom path to mpv binary (optional)
+	dynamicPlayerBackground: boolean; // Enable dynamic background based on album art
 }
 
 // ============================================================================
@@ -19,6 +20,7 @@ const SETTINGS_STORAGE_KEY = "slothsonic-settings";
 
 const defaultSettings: Settings = {
 	audioBackend: "html5",
+	dynamicPlayerBackground: false,
 };
 
 function loadSettings(): Settings {
@@ -199,6 +201,10 @@ export function setMpvPath(path: string | undefined): void {
 	updateSettings({ mpvPath: path });
 }
 
+export function setDynamicPlayerBackground(enabled: boolean): void {
+	updateSettings({ dynamicPlayerBackground: enabled });
+}
+
 // ============================================================================
 // React Hook
 // ============================================================================
@@ -211,6 +217,7 @@ export function useSettings() {
 		updateSettings,
 		setAudioBackend,
 		setMpvPath,
+		setDynamicPlayerBackground,
 		isElectron: isElectron(),
 		isMpvAvailable: isMpvAvailable(),
 	};

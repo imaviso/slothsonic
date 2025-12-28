@@ -38,6 +38,7 @@ export interface Song {
 	size?: number;
 	contentType?: string;
 	suffix?: string;
+	bitRate?: number;
 	path?: string;
 	starred?: string; // ISO date string if starred
 }

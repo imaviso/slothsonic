@@ -20,6 +20,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { getCurrentBackendType, switchAudioBackend } from "@/lib/player";
 import {
 	type AudioBackend,
@@ -32,8 +33,14 @@ export const Route = createFileRoute("/app/settings")({
 });
 
 function SettingsPage() {
-	const { settings, setAudioBackend, setMpvPath, isElectron, isMpvAvailable } =
-		useSettings();
+	const {
+		settings,
+		setAudioBackend,
+		setMpvPath,
+		setDynamicPlayerBackground,
+		isElectron,
+		isMpvAvailable,
+	} = useSettings();
 	const [mpvInstalled, setMpvInstalled] = useState<boolean | null>(null);
 	const [mpvPathInput, setMpvPathInput] = useState(settings.mpvPath || "");
 	const [pathValidating, setPathValidating] = useState(false);
@@ -120,6 +127,28 @@ function SettingsPage() {
 			</div>
 
 			<div className="max-w-2xl space-y-6">
+				{/* Appearance Settings */}
+				<Card>
+					<CardHeader>
+						<CardTitle>Appearance</CardTitle>
+						<CardDescription>Customize the look and feel</CardDescription>
+					</CardHeader>
+					<CardContent className="space-y-4">
+						<div className="flex items-center justify-between">
+							<div className="space-y-0.5">
+								<Label>Dynamic Player Background</Label>
+								<p className="text-sm text-muted-foreground">
+									Use colors from album art for the expanded player background
+								</p>
+							</div>
+							<Switch
+								checked={settings.dynamicPlayerBackground}
+								onCheckedChange={setDynamicPlayerBackground}
+							/>
+						</div>
+					</CardContent>
+				</Card>
+
 				<Card>
 					<CardHeader>
 						<CardTitle>Audio</CardTitle>
