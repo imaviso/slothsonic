@@ -2,9 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { FileText, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { getLyrics } from "@/lib/api";
+import { getLyrics, getLyricsBySongId } from "@/lib/api";
 
 interface LyricsPanelProps {
+	songId?: string;
 	songTitle: string;
 	songArtist: string;
 	onClose: () => void;
@@ -12,18 +13,50 @@ interface LyricsPanelProps {
 }
 
 export function LyricsPanel({
+	songId,
 	songTitle,
 	songArtist,
 	onClose,
 	showHeader = true,
 }: LyricsPanelProps) {
-	const { data: lyrics, isLoading } = useQuery({
-		queryKey: ["lyrics", songArtist, songTitle],
-		queryFn: () => getLyrics(songArtist, songTitle),
-		enabled: !!songArtist && !!songTitle,
+	// Try getLyricsBySongId first (OpenSubsonic extension)
+	const {
+		data: structuredLyrics,
+		isLoading: isLoadingById,
+		isError: isErrorById,
+	} = useQuery({
+		queryKey: ["lyricsBySongId", songId],
+		queryFn: () => getLyricsBySongId(songId as string),
+		enabled: !!songId,
 	});
 
-	const lyricsText = lyrics?.value ?? lyrics?.lyrics?.[0]?.value;
+	// Fall back to getLyrics (standard Subsonic API) if getLyricsBySongId fails or returns empty
+	const shouldFallback =
+		!songId ||
+		isErrorById ||
+		(structuredLyrics?.length === 0 && !isLoadingById);
+
+	const { data: lyrics, isLoading: isLoadingByTitle } = useQuery({
+		queryKey: ["lyrics", songArtist, songTitle],
+		queryFn: () => getLyrics(songArtist, songTitle),
+		enabled: shouldFallback && !!songArtist && !!songTitle,
+	});
+
+	const isLoading = isLoadingById || (shouldFallback && isLoadingByTitle);
+
+	// Extract lyrics text from either API response
+	let lyricsText: string | undefined;
+
+	if (structuredLyrics && structuredLyrics.length > 0) {
+		// Use structured lyrics from getLyricsBySongId
+		// Prefer unsynced lyrics, or use the first available
+		const preferredLyrics =
+			structuredLyrics.find((l) => !l.synced) ?? structuredLyrics[0];
+		lyricsText = preferredLyrics.line.map((l) => l.value).join("\n");
+	} else if (lyrics) {
+		// Use lyrics from getLyrics
+		lyricsText = lyrics.value ?? lyrics.lyrics?.[0]?.value;
+	}
 
 	return (
 		<div className="p-6 space-y-4 h-full flex flex-col">

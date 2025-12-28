@@ -490,6 +490,7 @@ export function Player() {
 			{mobileTab === "lyrics" && (
 				<div className="flex-1 overflow-hidden">
 					<LyricsPanel
+						songId={currentTrack.id}
 						songTitle={currentTrack.title}
 						songArtist={currentTrack.artist ?? ""}
 						onClose={() => setMobileTab("player")}
@@ -915,6 +916,7 @@ export function Player() {
 
 						{expandedTab === "lyrics" && (
 							<LyricsPanel
+								songId={currentTrack.id}
 								songTitle={currentTrack.title}
 								songArtist={currentTrack.artist ?? ""}
 								onClose={() => setExpandedTab("queue")}
@@ -1267,6 +1269,7 @@ export function Player() {
 						</div>
 						<div className="flex-1 overflow-hidden">
 							<LyricsPanel
+								songId={currentTrack.id}
 								songTitle={currentTrack.title}
 								songArtist={currentTrack.artist ?? ""}
 								onClose={() => setShowLyrics(false)}
