@@ -22,6 +22,8 @@ function AppHome() {
 	const { data: recentAlbums, isLoading: loadingAlbums } = useQuery({
 		queryKey: ["albums", "newest"],
 		queryFn: () => getAlbumList("newest", 12),
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		gcTime: 30 * 60 * 1000, // 30 minutes
 	});
 
 	// Library stats (albums, artists, songs counts)
@@ -35,12 +37,16 @@ function AppHome() {
 	const { data: starred, isLoading: loadingStarred } = useQuery({
 		queryKey: ["starred"],
 		queryFn: getStarred,
+		staleTime: 1 * 60 * 1000, // 1 minute
+		gcTime: 10 * 60 * 1000, // 10 minutes
 	});
 
 	// Most played albums
 	const { data: frequentAlbums, isLoading: loadingFrequent } = useQuery({
 		queryKey: ["albums", "frequent"],
 		queryFn: () => getAlbumList("frequent", 12),
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		gcTime: 30 * 60 * 1000, // 30 minutes
 	});
 
 	// Recently played albums
@@ -48,6 +54,8 @@ function AppHome() {
 		useQuery({
 			queryKey: ["albums", "recent"],
 			queryFn: () => getAlbumList("recent", 12),
+			staleTime: 2 * 60 * 1000, // 2 minutes (changes more frequently)
+			gcTime: 15 * 60 * 1000, // 15 minutes
 		});
 
 	const formatNumber = (num: number) => {

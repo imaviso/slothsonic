@@ -48,6 +48,8 @@ function AlbumsPage() {
 		queryKey: ["search", "albums", debouncedSearch],
 		queryFn: () => search(debouncedSearch),
 		enabled: isSearching,
+		staleTime: 2 * 60 * 1000, // 2 minutes
+		gcTime: 10 * 60 * 1000, // 10 minutes
 	});
 
 	// Infinite scroll for browsing albums
@@ -69,6 +71,8 @@ function AlbumsPage() {
 		},
 		initialPageParam: 0,
 		enabled: !isSearching,
+		staleTime: 5 * 60 * 1000, // 5 minutes
+		gcTime: 30 * 60 * 1000, // 30 minutes
 	});
 
 	// Flatten all pages into a single array

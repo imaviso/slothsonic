@@ -18,6 +18,8 @@ function GenresPage() {
 	const { data: genres, isLoading } = useQuery({
 		queryKey: ["genres"],
 		queryFn: getGenres,
+		staleTime: 10 * 60 * 1000, // 10 minutes - genres rarely change
+		gcTime: 60 * 60 * 1000, // 1 hour
 	});
 
 	const filteredGenres =

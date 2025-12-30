@@ -16,6 +16,8 @@ function ArtistsPage() {
 	const { data: artists, isLoading } = useQuery({
 		queryKey: ["artists"],
 		queryFn: getArtists,
+		staleTime: 10 * 60 * 1000, // 10 minutes - artist list rarely changes
+		gcTime: 60 * 60 * 1000, // 1 hour
 	});
 
 	const filteredArtists =

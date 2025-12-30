@@ -40,6 +40,8 @@ function AlbumDetailPage() {
 	const { data, isLoading, error } = useQuery({
 		queryKey: ["album", albumId],
 		queryFn: () => getAlbum(albumId),
+		staleTime: 10 * 60 * 1000, // 10 minutes
+		gcTime: 60 * 60 * 1000, // 1 hour
 	});
 
 	useEffect(() => {

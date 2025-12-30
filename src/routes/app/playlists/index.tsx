@@ -135,6 +135,8 @@ function PlaylistsPage() {
 	const { data: playlists, isLoading } = useQuery({
 		queryKey: ["playlists"],
 		queryFn: getPlaylists,
+		staleTime: 2 * 60 * 1000, // 2 minutes
+		gcTime: 15 * 60 * 1000, // 15 minutes
 	});
 
 	const createMutation = useMutation({

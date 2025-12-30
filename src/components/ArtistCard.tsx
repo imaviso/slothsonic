@@ -1,9 +1,11 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { User } from "lucide-react";
-import { useEffect, useState } from "react";
+import { memo, useCallback, useState } from "react";
 
+import { useCoverArt } from "@/hooks/use-cover-art";
 import type { Artist } from "@/lib/api";
-import { getCoverArtUrl } from "@/lib/api";
+import { getArtist } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ArtistContextMenu } from "./ArtistContextMenu";
 import { StarButton } from "./StarButton";
@@ -13,71 +15,89 @@ interface ArtistCardProps {
 	className?: string;
 }
 
-export function ArtistCard({ artist, className }: ArtistCardProps) {
-	const [coverUrl, setCoverUrl] = useState<string | null>(null);
-	const [imageError, setImageError] = useState(false);
-	const [imageLoaded, setImageLoaded] = useState(false);
+export const ArtistCard = memo(
+	function ArtistCard({ artist, className }: ArtistCardProps) {
+		const { data: coverUrl } = useCoverArt(artist.coverArt, 300);
+		const [imageError, setImageError] = useState(false);
+		const [imageLoaded, setImageLoaded] = useState(false);
+		const queryClient = useQueryClient();
 
-	useEffect(() => {
-		if (artist.coverArt) {
-			getCoverArtUrl(artist.coverArt, 300).then(setCoverUrl);
-		}
-	}, [artist.coverArt]);
+		// Prefetch artist details on hover
+		const handleMouseEnter = useCallback(() => {
+			queryClient.prefetchQuery({
+				queryKey: ["artist", artist.id],
+				queryFn: () => getArtist(artist.id),
+				staleTime: 10 * 60 * 1000, // 10 minutes
+			});
+		}, [queryClient, artist.id]);
 
-	return (
-		<ArtistContextMenu artist={artist}>
-			<Link
-				to="/app/artists/$artistId"
-				params={{ artistId: artist.id }}
-				className={cn(
-					"group block rounded-lg bg-card p-3 transition-colors hover:bg-accent",
-					className,
-				)}
-			>
-				{/* Artist Image */}
-				<div className="aspect-square rounded-full overflow-hidden bg-muted mb-3 relative">
-					{coverUrl && !imageError ? (
-						<img
-							src={coverUrl}
-							alt={artist.name}
-							className={cn(
-								"w-full h-full object-cover transition-all duration-200 group-hover:scale-105",
-								imageLoaded ? "opacity-100" : "opacity-0",
-							)}
-							onLoad={() => setImageLoaded(true)}
-							onError={() => setImageError(true)}
-						/>
-					) : (
-						<div className="w-full h-full flex items-center justify-center">
-							<User className="w-12 h-12 text-muted-foreground" />
+		return (
+			<ArtistContextMenu artist={artist}>
+				<Link
+					to="/app/artists/$artistId"
+					params={{ artistId: artist.id }}
+					onMouseEnter={handleMouseEnter}
+					className={cn(
+						"group block rounded-lg bg-card p-3 transition-colors hover:bg-accent",
+						className,
+					)}
+				>
+					{/* Artist Image */}
+					<div className="aspect-square rounded-full overflow-hidden bg-muted mb-3 relative">
+						{coverUrl && !imageError ? (
+							<img
+								src={coverUrl}
+								alt={artist.name}
+								loading="lazy"
+								className={cn(
+									"w-full h-full object-cover transition-all duration-200 group-hover:scale-105",
+									imageLoaded ? "opacity-100" : "opacity-0",
+								)}
+								onLoad={() => setImageLoaded(true)}
+								onError={() => setImageError(true)}
+							/>
+						) : (
+							<div className="w-full h-full flex items-center justify-center">
+								<User className="w-12 h-12 text-muted-foreground" />
+							</div>
+						)}
+						{/* Star button overlay */}
+						<div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+							<StarButton
+								id={artist.id}
+								type="artist"
+								isStarred={!!artist.starred}
+								size="sm"
+							/>
 						</div>
-					)}
-					{/* Star button overlay */}
-					<div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-						<StarButton
-							id={artist.id}
-							type="artist"
-							isStarred={!!artist.starred}
-							size="sm"
-						/>
 					</div>
-				</div>
 
-				{/* Artist Info */}
-				<div className="text-center">
-					<h3 className="font-medium text-sm text-foreground truncate group-hover:text-primary">
-						{artist.name}
-					</h3>
-					{artist.albumCount !== undefined && (
-						<p className="text-xs text-muted-foreground">
-							{artist.albumCount} album{artist.albumCount !== 1 ? "s" : ""}
-						</p>
-					)}
-				</div>
-			</Link>
-		</ArtistContextMenu>
-	);
-}
+					{/* Artist Info */}
+					<div className="text-center">
+						<h3 className="font-medium text-sm text-foreground truncate group-hover:text-primary">
+							{artist.name}
+						</h3>
+						{artist.albumCount !== undefined && (
+							<p className="text-xs text-muted-foreground">
+								{artist.albumCount} album{artist.albumCount !== 1 ? "s" : ""}
+							</p>
+						)}
+					</div>
+				</Link>
+			</ArtistContextMenu>
+		);
+	},
+	(prevProps, nextProps) => {
+		return (
+			prevProps.artist.id === nextProps.artist.id &&
+			prevProps.artist.starred === nextProps.artist.starred &&
+			prevProps.artist.name === nextProps.artist.name &&
+			prevProps.artist.coverArt === nextProps.artist.coverArt &&
+			prevProps.artist.albumCount === nextProps.artist.albumCount &&
+			prevProps.className === nextProps.className
+		);
+	},
+);
 
 interface ArtistGridProps {
 	artists: Artist[];

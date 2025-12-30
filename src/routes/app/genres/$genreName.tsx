@@ -27,6 +27,8 @@ function GenreDetailPage() {
 				return allPages.length * 50;
 			},
 			initialPageParam: 0,
+			staleTime: 5 * 60 * 1000, // 5 minutes
+			gcTime: 30 * 60 * 1000, // 30 minutes
 		});
 
 	const songs = data?.pages.flat() ?? [];
@@ -142,7 +144,7 @@ function GenreDetailPage() {
 				</div>
 			) : (
 				<>
-					<SongList songs={songs} showAlbum showArtist />
+					<SongList songs={songs} showAlbum showArtist maxHeight={500} />
 
 					{/* Load more trigger */}
 					<div

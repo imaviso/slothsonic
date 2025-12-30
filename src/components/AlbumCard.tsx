@@ -1,9 +1,11 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Disc3 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { memo, useCallback, useState } from "react";
 
+import { useCoverArt } from "@/hooks/use-cover-art";
 import type { Album } from "@/lib/api";
-import { getCoverArtUrl } from "@/lib/api";
+import { getAlbum } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { AlbumContextMenu } from "./AlbumContextMenu";
 import { StarButton } from "./StarButton";
@@ -13,74 +15,91 @@ interface AlbumCardProps {
 	className?: string;
 }
 
-export function AlbumCard({ album, className }: AlbumCardProps) {
-	const [coverUrl, setCoverUrl] = useState<string | null>(null);
-	const [imageError, setImageError] = useState(false);
-	const [imageLoaded, setImageLoaded] = useState(false);
+export const AlbumCard = memo(
+	function AlbumCard({ album, className }: AlbumCardProps) {
+		const { data: coverUrl } = useCoverArt(album.coverArt, 300);
+		const [imageError, setImageError] = useState(false);
+		const [imageLoaded, setImageLoaded] = useState(false);
+		const queryClient = useQueryClient();
 
-	useEffect(() => {
-		if (album.coverArt) {
-			getCoverArtUrl(album.coverArt, 300).then(setCoverUrl);
-		}
-	}, [album.coverArt]);
+		// Prefetch album details on hover
+		const handleMouseEnter = useCallback(() => {
+			queryClient.prefetchQuery({
+				queryKey: ["album", album.id],
+				queryFn: () => getAlbum(album.id),
+				staleTime: 10 * 60 * 1000, // 10 minutes
+			});
+		}, [queryClient, album.id]);
 
-	return (
-		<AlbumContextMenu album={album}>
-			<Link
-				to="/app/albums/$albumId"
-				params={{ albumId: album.id }}
-				className={cn(
-					"group block rounded-lg bg-card p-3 transition-colors hover:bg-accent",
-					className,
-				)}
-			>
-				{/* Album Cover */}
-				<div className="aspect-square rounded-md overflow-hidden bg-muted mb-3 relative">
-					{coverUrl && !imageError ? (
-						<img
-							src={coverUrl}
-							alt={album.name}
-							className={cn(
-								"w-full h-full object-cover transition-all duration-200 group-hover:scale-105",
-								imageLoaded ? "opacity-100" : "opacity-0",
-							)}
-							onLoad={() => setImageLoaded(true)}
-							onError={() => setImageError(true)}
-						/>
-					) : (
-						<div className="w-full h-full flex items-center justify-center">
-							<Disc3 className="w-12 h-12 text-muted-foreground" />
+		return (
+			<AlbumContextMenu album={album}>
+				<Link
+					to="/app/albums/$albumId"
+					params={{ albumId: album.id }}
+					onMouseEnter={handleMouseEnter}
+					className={cn(
+						"group block rounded-lg bg-card p-3 transition-colors hover:bg-accent",
+						className,
+					)}
+				>
+					{/* Album Cover */}
+					<div className="aspect-square rounded-md overflow-hidden bg-muted mb-3 relative">
+						{coverUrl && !imageError ? (
+							<img
+								src={coverUrl}
+								alt={album.name}
+								loading="lazy"
+								className={cn(
+									"w-full h-full object-cover transition-all duration-200 group-hover:scale-105",
+									imageLoaded ? "opacity-100" : "opacity-0",
+								)}
+								onLoad={() => setImageLoaded(true)}
+								onError={() => setImageError(true)}
+							/>
+						) : (
+							<div className="w-full h-full flex items-center justify-center">
+								<Disc3 className="w-12 h-12 text-muted-foreground" />
+							</div>
+						)}
+						{/* Star button overlay */}
+						<div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+							<StarButton
+								id={album.id}
+								type="album"
+								isStarred={!!album.starred}
+								size="sm"
+							/>
 						</div>
-					)}
-					{/* Star button overlay */}
-					<div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-						<StarButton
-							id={album.id}
-							type="album"
-							isStarred={!!album.starred}
-							size="sm"
-						/>
 					</div>
-				</div>
 
-				{/* Album Info */}
-				<div className="space-y-1">
-					<h3 className="font-medium text-sm text-foreground truncate group-hover:text-primary">
-						{album.name}
-					</h3>
-					{album.artist && (
-						<p className="text-xs text-muted-foreground truncate">
-							{album.artist}
-						</p>
-					)}
-					{album.year && (
-						<p className="text-xs text-muted-foreground">{album.year}</p>
-					)}
-				</div>
-			</Link>
-		</AlbumContextMenu>
-	);
-}
+					{/* Album Info */}
+					<div className="space-y-1">
+						<h3 className="font-medium text-sm text-foreground truncate group-hover:text-primary">
+							{album.name}
+						</h3>
+						{album.artist && (
+							<p className="text-xs text-muted-foreground truncate">
+								{album.artist}
+							</p>
+						)}
+						{album.year && (
+							<p className="text-xs text-muted-foreground">{album.year}</p>
+						)}
+					</div>
+				</Link>
+			</AlbumContextMenu>
+		);
+	},
+	(prevProps, nextProps) => {
+		return (
+			prevProps.album.id === nextProps.album.id &&
+			prevProps.album.starred === nextProps.album.starred &&
+			prevProps.album.name === nextProps.album.name &&
+			prevProps.album.coverArt === nextProps.album.coverArt &&
+			prevProps.className === nextProps.className
+		);
+	},
+);
 
 interface AlbumGridProps {
 	albums: Album[];

@@ -150,6 +150,8 @@ function PlaylistDetailPage() {
 	} = useQuery({
 		queryKey: ["playlist", playlistId],
 		queryFn: () => getPlaylist(playlistId),
+		staleTime: 2 * 60 * 1000, // 2 minutes
+		gcTime: 15 * 60 * 1000, // 15 minutes
 	});
 
 	const updateMutation = useMutation({

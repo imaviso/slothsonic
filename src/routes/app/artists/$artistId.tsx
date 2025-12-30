@@ -22,6 +22,8 @@ function ArtistDetailPage() {
 	const { data, isLoading, error } = useQuery({
 		queryKey: ["artist", artistId],
 		queryFn: () => getArtist(artistId),
+		staleTime: 10 * 60 * 1000, // 10 minutes
+		gcTime: 60 * 60 * 1000, // 1 hour
 	});
 
 	useEffect(() => {

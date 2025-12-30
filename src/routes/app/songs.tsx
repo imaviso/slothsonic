@@ -20,6 +20,8 @@ function SongsPage() {
 	} = useQuery({
 		queryKey: ["randomSongs"],
 		queryFn: () => getRandomSongs(100),
+		staleTime: 0, // Always refetch on mount (random songs should be fresh)
+		gcTime: 5 * 60 * 1000, // 5 minutes
 	});
 
 	const handleShufflePlay = () => {
@@ -58,7 +60,7 @@ function SongsPage() {
 			</div>
 
 			{/* Song List */}
-			<SongList songs={songs ?? []} isLoading={isLoading} />
+			<SongList songs={songs ?? []} isLoading={isLoading} maxHeight="auto" />
 		</div>
 	);
 }
