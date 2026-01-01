@@ -39,9 +39,6 @@ const socketPath = isWindows
 let mpvInstance = null;
 let mpvPath = null; // Will be detected or set by user
 let currentVolume = 100;
-let lastPlaylistPos = 0; // Track expected playlist position
-let autoNextLock = false; // Prevent duplicate autoNext events
-let autoNextTimeout = null; // Debounce timeout
 
 // Common paths where MPV might be installed
 const MPV_SEARCH_PATHS = isWindows
@@ -177,35 +174,14 @@ const createMpv = async (options = {}) => {
 	// Event: playlist position changed (track ended, auto-next) and pause state
 	mpv.on("status", (status) => {
 		if (status.property === "playlist-pos") {
-			const newPos = status.value;
-			
-			if (newPos === -1) {
+			if (status.value === -1) {
 				// End of playlist
 				mpv?.pause();
-				lastPlaylistPos = 0;
-			} else if (newPos > lastPlaylistPos && !autoNextLock) {
-				// MPV auto-advanced to next track (position increased)
-				// Use a lock and debounce to prevent duplicate events
-				autoNextLock = true;
-				
-				// Clear any pending timeout
-				if (autoNextTimeout) {
-					clearTimeout(autoNextTimeout);
-				}
-				
-				// Debounce: wait a short moment to ensure we don't fire multiple times
-				autoNextTimeout = setTimeout(() => {
-					sendToRenderer("mpv:autoNext");
-					// Reset lock after a delay to allow next transition
-					setTimeout(() => {
-						autoNextLock = false;
-					}, 500);
-				}, 50);
-				
-				lastPlaylistPos = newPos;
-			} else if (newPos === 0 && lastPlaylistPos > 0) {
-				// Playlist was reset (e.g., after we removed tracks)
-				lastPlaylistPos = 0;
+			}
+
+			if (status.value !== 0) {
+				// MPV auto-advanced to next track in playlist
+				sendToRenderer("mpv:autoNext");
 			}
 		}
 		// Handle pause state changes via status event
@@ -451,14 +427,6 @@ function setupMpvIpcHandlers() {
 			throw new Error("MPV not initialized");
 		}
 
-		// Reset position tracking when playing a new track
-		lastPlaylistPos = 0;
-		autoNextLock = false;
-		if (autoNextTimeout) {
-			clearTimeout(autoNextTimeout);
-			autoNextTimeout = null;
-		}
-
 		try {
 			await mpv.load(url, "replace");
 			await mpv.play();
@@ -473,14 +441,6 @@ function setupMpvIpcHandlers() {
 	ipcMain.handle("mpv:setQueue", async (_, current, next, shouldPause) => {
 		const mpv = getMpvInstance();
 		if (!mpv) return;
-
-		// Reset position tracking when setting a new queue
-		lastPlaylistPos = 0;
-		autoNextLock = false;
-		if (autoNextTimeout) {
-			clearTimeout(autoNextTimeout);
-			autoNextTimeout = null;
-		}
 
 		if (!current && !next) {
 			try {
@@ -533,23 +493,19 @@ function setupMpvIpcHandlers() {
 	});
 
 	// Handle auto-next (called from renderer after receiving mpv:autoNext)
+	// Always keep the current song as position 0 in the mpv queue.
+	// This allows us to easily update the next song without disturbing playback.
 	ipcMain.on("mpv:autoNext", async (_, url) => {
 		const mpv = getMpvInstance();
 		if (!mpv) return;
 
 		try {
-			// Get current playlist size
-			const size = await mpv.getPlaylistSize().catch(() => 0);
-			
-			// Remove the track that just finished (position 0) if playlist has items
-			if (size > 1) {
-				await mpv.playlistRemove(0).catch(() => {});
-			}
-			
-			// Reset position tracking - we're now at position 0 of the new playlist
-			lastPlaylistPos = 0;
+			// Remove the finished track at position 0
+			await mpv.playlistRemove(0).catch(() => {
+				mpv.pause();
+			});
 
-			// Append next track if provided
+			// Append the next-next track for gapless playback
 			if (url) {
 				await mpv.load(url, "append");
 			}

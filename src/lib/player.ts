@@ -247,19 +247,9 @@ async function handleAutoNext() {
 			});
 		}
 
-		// Preload the next track after this one
+		// Tell MPV to clean up its playlist and queue the next-next track
+		// This handles both removing the finished track and preloading the next one
 		const followingIndex = nextIndex + 1;
-		if (followingIndex < queue.length && currentBackend) {
-			const followingTrack = queue[followingIndex];
-			try {
-				const followingUrl = await getStreamUrl(followingTrack.id);
-				await currentBackend.setQueueNext(followingUrl);
-			} catch (err) {
-				console.error("Failed to preload next track:", err);
-			}
-		}
-
-		// Tell MPV about the next URL (for its internal queue management)
 		if (followingIndex < queue.length) {
 			const followingTrack = queue[followingIndex];
 			try {
