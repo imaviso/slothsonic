@@ -103,13 +103,13 @@
             mkdir -p $out/lib/slothsonic
             mkdir -p $out/bin
             mkdir -p $out/share/applications
-            mkdir -p $out/share/icons/hicolor/512x512/apps
+            mkdir -p $out/share/icons/hicolor/scalable/apps
 
             # Copy from frontend build
             cp -r $src/* $out/lib/slothsonic/
 
             # Copy icon from source
-            cp ${./public/logo512.png} $out/share/icons/hicolor/512x512/apps/slothsonic.png
+            cp ${./public/extension_icon.svg} $out/share/icons/hicolor/scalable/apps/slothsonic.svg
 
             # Create desktop entry
             cat > $out/share/applications/slothsonic.desktop << EOF
