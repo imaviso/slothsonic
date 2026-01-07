@@ -1,12 +1,14 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AlbumCard } from "@/components/AlbumCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { type AlbumListType, getAlbumList, search } from "@/lib/api";
+import type { Album, AlbumListType } from "@/lib/api";
+import { getAlbumList, search } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/app/albums/")({
@@ -23,6 +25,175 @@ const sortOptions: { value: AlbumListType; label: string }[] = [
 ];
 
 const PAGE_SIZE = 50;
+const GAP = 16; // gap-4 = 1rem = 16px
+const CARD_PADDING = 24; // p-3 top + bottom = 12px * 2
+const CARD_COVER_MARGIN = 12; // mb-3 between cover and text
+const TEXT_HEIGHT = 60; // Approximate height of title + artist + year
+
+// Breakpoints matching Tailwind's responsive prefixes
+const BREAKPOINTS = {
+	sm: 640,
+	md: 768,
+	lg: 1024,
+	xl: 1280,
+};
+
+function getColumnCount(width: number): number {
+	if (width >= BREAKPOINTS.xl) return 6;
+	if (width >= BREAKPOINTS.lg) return 5;
+	if (width >= BREAKPOINTS.md) return 4;
+	if (width >= BREAKPOINTS.sm) return 3;
+	return 2;
+}
+
+// Calculate row height based on container width and column count
+// Card height = padding + aspect-square cover + margin + text + gap
+function getRowHeight(containerWidth: number, columnCount: number): number {
+	const cardWidth = (containerWidth - GAP * (columnCount - 1)) / columnCount;
+	const coverHeight = cardWidth - CARD_PADDING; // Cover is square, minus horizontal padding
+	return CARD_PADDING + coverHeight + CARD_COVER_MARGIN + TEXT_HEIGHT + GAP;
+}
+
+interface VirtualizedAlbumGridProps {
+	albums: Album[];
+	onLoadMore?: () => void;
+	hasNextPage?: boolean;
+	isFetchingNextPage?: boolean;
+}
+
+function VirtualizedAlbumGrid({
+	albums,
+	onLoadMore,
+	hasNextPage,
+	isFetchingNextPage,
+}: VirtualizedAlbumGridProps) {
+	const containerRef = useRef<HTMLDivElement>(null);
+	const [columnCount, setColumnCount] = useState(6);
+	const [containerWidth, setContainerWidth] = useState(1200);
+
+	// Track container width to determine column count and row height
+	useEffect(() => {
+		const container = containerRef.current;
+		if (!container) return;
+
+		const updateDimensions = () => {
+			const width = container.offsetWidth;
+			setContainerWidth(width);
+			setColumnCount(getColumnCount(width));
+		};
+
+		updateDimensions();
+
+		const resizeObserver = new ResizeObserver(updateDimensions);
+		resizeObserver.observe(container);
+
+		return () => resizeObserver.disconnect();
+	}, []);
+
+	const rowHeight = useMemo(
+		() => getRowHeight(containerWidth, columnCount),
+		[containerWidth, columnCount],
+	);
+
+	// Group albums into rows
+	const rows = useMemo(() => {
+		const result: Album[][] = [];
+		for (let i = 0; i < albums.length; i += columnCount) {
+			result.push(albums.slice(i, i + columnCount));
+		}
+		return result;
+	}, [albums, columnCount]);
+
+	const virtualizer = useVirtualizer({
+		count: rows.length,
+		getScrollElement: () => containerRef.current,
+		estimateSize: () => rowHeight,
+		overscan: 3,
+	});
+
+	// Recalculate virtual items when row height changes
+	// biome-ignore lint/correctness/useExhaustiveDependencies: rowHeight change should trigger remeasure
+	useEffect(() => {
+		virtualizer.measure();
+	}, [rowHeight]);
+
+	// Trigger load more when scrolling near the bottom
+	useEffect(() => {
+		const container = containerRef.current;
+		if (!container || !onLoadMore || !hasNextPage || isFetchingNextPage) return;
+
+		const handleScroll = () => {
+			const { scrollTop, scrollHeight, clientHeight } = container;
+			// Load more when within 200px of bottom
+			if (scrollHeight - scrollTop - clientHeight < 200) {
+				onLoadMore();
+			}
+		};
+
+		container.addEventListener("scroll", handleScroll, { passive: true });
+		return () => container.removeEventListener("scroll", handleScroll);
+	}, [onLoadMore, hasNextPage, isFetchingNextPage]);
+
+	return (
+		<div
+			ref={containerRef}
+			className="h-[calc(100vh-280px)] overflow-auto"
+			style={{ contain: "strict" }}
+		>
+			<div
+				style={{
+					height: virtualizer.getTotalSize(),
+					width: "100%",
+					position: "relative",
+				}}
+			>
+				{virtualizer.getVirtualItems().map((virtualRow) => {
+					const rowAlbums = rows[virtualRow.index];
+					return (
+						<div
+							key={virtualRow.key}
+							style={{
+								position: "absolute",
+								top: 0,
+								left: 0,
+								width: "100%",
+								height: virtualRow.size,
+								transform: `translateY(${virtualRow.start}px)`,
+							}}
+						>
+							<div
+								className="grid gap-4"
+								style={{
+									gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
+								}}
+							>
+								{rowAlbums.map((album) => (
+									<AlbumCard key={album.id} album={album} />
+								))}
+							</div>
+						</div>
+					);
+				})}
+			</div>
+			{/* Load more indicator at bottom */}
+			{isFetchingNextPage && (
+				<div className="flex justify-center py-4">
+					<div className="flex items-center gap-2 text-muted-foreground">
+						<Loader2 className="w-4 h-4 animate-spin" />
+						<span>Loading more...</span>
+					</div>
+				</div>
+			)}
+			{!hasNextPage && albums.length > 0 && (
+				<div className="flex justify-center py-4">
+					<span className="text-muted-foreground text-sm">
+						All {albums.length} albums loaded
+					</span>
+				</div>
+			)}
+		</div>
+	);
+}
 
 function useDebounce<T>(value: T, delay: number): T {
 	const [debouncedValue, setDebouncedValue] = useState(value);
@@ -39,7 +210,6 @@ function AlbumsPage() {
 	const [sortType, setSortType] = useState<AlbumListType>("newest");
 	const [searchQuery, setSearchQuery] = useState("");
 	const debouncedSearch = useDebounce(searchQuery, 300);
-	const loadMoreRef = useRef<HTMLDivElement>(null);
 
 	const isSearching = debouncedSearch.trim().length > 0;
 
@@ -84,37 +254,6 @@ function AlbumsPage() {
 	const displayAlbums = isSearching ? (searchResults?.albums ?? []) : allAlbums;
 
 	const isLoading = isSearching ? isSearchLoading : isBrowseLoading;
-
-	// Intersection Observer for infinite scrolling
-	const handleObserver = useCallback(
-		(entries: IntersectionObserverEntry[]) => {
-			const [target] = entries;
-			if (
-				target.isIntersecting &&
-				hasNextPage &&
-				!isFetchingNextPage &&
-				!isSearching
-			) {
-				fetchNextPage();
-			}
-		},
-		[fetchNextPage, hasNextPage, isFetchingNextPage, isSearching],
-	);
-
-	useEffect(() => {
-		const element = loadMoreRef.current;
-		if (!element) return;
-
-		const observer = new IntersectionObserver(handleObserver, {
-			root: null,
-			rootMargin: "100px",
-			threshold: 0,
-		});
-
-		observer.observe(element);
-
-		return () => observer.disconnect();
-	}, [handleObserver]);
 
 	return (
 		<div className="p-6 space-y-6">
@@ -176,33 +315,12 @@ function AlbumsPage() {
 					</p>
 				</div>
 			) : (
-				<>
-					<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-						{displayAlbums.map((album) => (
-							<AlbumCard key={album.id} album={album} />
-						))}
-					</div>
-
-					{/* Load more trigger - only for browsing, not search */}
-					{!isSearching && (
-						<div ref={loadMoreRef} className="flex justify-center py-4">
-							{isFetchingNextPage ? (
-								<div className="flex items-center gap-2 text-muted-foreground">
-									<Loader2 className="w-4 h-4 animate-spin" />
-									<span>Loading more...</span>
-								</div>
-							) : hasNextPage ? (
-								<span className="text-muted-foreground text-sm">
-									Scroll for more
-								</span>
-							) : allAlbums.length > 0 ? (
-								<span className="text-muted-foreground text-sm">
-									All {allAlbums.length} albums loaded
-								</span>
-							) : null}
-						</div>
-					)}
-				</>
+				<VirtualizedAlbumGrid
+					albums={displayAlbums}
+					onLoadMore={isSearching ? undefined : fetchNextPage}
+					hasNextPage={isSearching ? false : hasNextPage}
+					isFetchingNextPage={isFetchingNextPage}
+				/>
 			)}
 		</div>
 	);
