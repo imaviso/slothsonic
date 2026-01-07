@@ -37,16 +37,16 @@
     ],
     "mac": {
       "target": ["dmg", "zip"],
-      "icon": "public/logo512.png",
+      "icon": "public/extension_icon.png",
       "category": "public.app-category.music"
     },
     "win": {
       "target": ["nsis", "portable"],
-      "icon": "public/logo512.png"
+      "icon": "public/extension_icon.png"
     },
     "linux": {
       "target": ["AppImage"],
-      "icon": "public/logo512.png",
+      "icon": "public/extension_icon.png",
       "category": "Audio"
     },
     "nsis": {
